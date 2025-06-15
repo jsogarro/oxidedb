@@ -1,0 +1,115 @@
+// Chapter 1: Atoms and Basic Arithmetic Examples
+// This file demonstrates the basic concepts from Chapter 1
+
+// Basic Integer Atoms
+// Expected output: 42
+42
+
+// Expected output: -17
+-17
+
+// Expected output: 0
+0
+
+// Basic Floating Point Numbers
+// Expected output: 3.14159
+3.14159
+
+// Expected output: -2.5
+-2.5
+
+// Boolean Values
+// Expected output: 1b
+1b
+
+// Expected output: 0b
+0b
+
+// Character Values
+// Expected output: "a"
+"a"
+
+// Expected output: "Z"
+"Z"
+
+// Basic Addition
+// Expected output: 5
+2 + 3
+
+// Expected output: 17
+10 + 7
+
+// Expected output: 4
+2.5 + 1.5
+
+// Basic Subtraction
+// Expected output: 7
+10 - 3
+
+// Expected output: -3
+5 - 8
+
+// Basic Multiplication
+// Expected output: 20
+4 * 5
+
+// Expected output: 21
+3 * 7
+
+// Basic Division (using % symbol)
+// Expected output: 5
+15 % 3
+
+// Expected output: 5
+20 % 4
+
+// Right-to-Left Evaluation Examples
+// This is the key concept: operations are evaluated from right to left
+
+// Expected output: 7 (evaluated as 1 + (2 * 3) = 1 + 6 = 7)
+1 + 2 * 3
+
+// Expected output: 14 (evaluated as 2 + (3 * 4) = 2 + 12 = 14)
+2 + 3 * 4
+
+// Expected output: 1 (evaluated as 4 - (2 + 1) = 4 - 3 = 1)
+4 - 2 + 1
+
+// Expected output: 2 (evaluated as 8 % (2 + 2) = 8 % 4 = 2)
+8 % 2 + 2
+
+// Parentheses Override Right-to-Left Evaluation
+// Expected output: 20 (parentheses force (2 + 3) first: 5 * 4 = 20)
+(2 + 3) * 4
+
+// Expected output: 14 (parentheses force (10 - 3) first: 7 * 2 = 14)
+(10 - 3) * 2
+
+// Mixed Type Arithmetic
+// O automatically promotes integers to floats when needed
+
+// Expected output: 7.5
+5 + 2.5
+
+// Expected output: 12
+3.0 * 4
+
+// Negative Numbers
+// Expected output: -5
+-5
+
+// Expected output: -3.14
+-3.14
+
+// Expected output: -2
+-5 + 3
+
+// Complex Right-to-Left Examples
+// Expected output: 11 (evaluated as 3 + (4 * 2) = 3 + 8 = 11)
+3 + 4 * 2
+
+// Expected output: 4 (evaluated as 10 - (2 * 3) = 10 - 6 = 4)
+10 - 2 * 3
+
+// Expected output: 3 (evaluated as 15 % (3 + 2) = 15 % 5 = 3)
+15 % 3 + 2

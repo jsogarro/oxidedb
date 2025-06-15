@@ -1,0 +1,44 @@
+# O for Humans
+
+A comprehensive guide to the O programming language and OxideDB database system.
+
+## Table of Contents
+
+- [Introduction](chapters/00-introduction.md)
+- [Chapter 1: Atoms and Basic Arithmetic](chapters/01-atoms-and-arithmetic.md)
+- [Chapter 2: Variables and Assignment](chapters/02-variables-and-assignment.md)
+
+### Coming Soon
+
+- Chapter 3: Vectors and Lists
+- Chapter 4: Dictionaries and Tables  
+- Chapter 5: Functions and Control Flow
+- Chapter 6: Advanced Operations
+
+## About This Book
+
+"O for Humans" is a practical guide to learning the O programming language, inspired by the classic "Q For Mortals". The O language is the query and programming language of OxideDB, a high-performance columnar database implemented in Rust.
+
+This book teaches O through hands-on examples that you can try in the OxideDB REPL. Each chapter builds upon the previous one, gradually introducing more sophisticated concepts and techniques.
+
+## Getting Started
+
+To follow along with this book, you'll need to have OxideDB installed and running. See the main project README for installation instructions.
+
+Start the REPL with:
+```bash
+cargo run
+```
+
+You can exit the REPL using `exit`, `quit`, or `\\`.
+
+## Running Examples
+
+The `/examples` directory contains executable O files demonstrating the concepts from each chapter. Run them with:
+
+```bash
+cargo run -- book/examples/01-atoms-and-arithmetic.o
+cargo run -- book/examples/02-variables-and-assignment.o
+```
+
+Each file includes detailed comments explaining the expected output.
