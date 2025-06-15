@@ -169,3 +169,12 @@ harness = false
 - Use Rust's type system to prevent runtime errors where possible
 
 Please set up this project structure and implement the basic REPL with support for integer arithmetic as the first milestone.
+
+## Making Changes
+
+- Add functionality related to each chapter.
+- Add a chapter in the book covering the functionality using the same examples from Q for Mortals.
+- Make sure the examples work and provide the expected output before adding it to the book.
+- Add a new file in /book/examples that runs and prints all of the examples.
+- Make sure comprehensive test cases are added for each new feature created.
+- Update the README.md in the root of this project with the latest changes to accompany each commit. 
