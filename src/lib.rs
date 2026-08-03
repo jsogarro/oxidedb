@@ -8,3 +8,7 @@ pub use types::atom::Atom;
 pub use language::lexer::Lexer;
 pub use language::parser::Parser;
 pub use language::interpreter::Interpreter;
+
+pub fn engine_name() -> &'static str {
+    "oxidedb"
+}
