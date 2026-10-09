@@ -98,6 +98,15 @@ impl fmt::Display for Atom {
         match self {
             Atom::Boolean(b) => write!(f, "{}", if *b { "1b" } else { "0b" }),
             Atom::Integer(i) => write!(f, "{}", i),
+            Atom::Float(fl) if fl.is_nan() => write!(f, "0n"),
+            Atom::Float(fl) if fl.is_infinite() => {
+                write!(f, "{}0w", if *fl < 0.0 { "-" } else { "" })
+            }
+            // Integral floats below 1e15 print as `20f`; larger ones in q-style exponent form.
+            Atom::Float(fl) if fl.fract() == 0.0 && fl.abs() < 1e15 => write!(f, "{}f", fl),
+            Atom::Float(fl) if fl.fract() == 0.0 => {
+                write!(f, "{}", format!("{:e}", fl).replace('e', "e+"))
+            }
             Atom::Float(fl) => write!(f, "{}", fl),
             Atom::Character(c) => write!(f, "\"{}\"", c),
             Atom::Date(d) => write!(f, "{}", d.format("%Y.%m.%d")),

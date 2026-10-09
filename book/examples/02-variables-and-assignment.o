@@ -140,7 +140,7 @@ fahrenheit:celsius*ratio+32
 fahrenheit
 
 // Better temperature conversion with floats for accurate ratio
-// Expected output: 20.0
+// Expected output: 20f
 celsius_float:20.0
 
 // Expected output: 1.8
