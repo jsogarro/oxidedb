@@ -130,7 +130,7 @@ oxidedb> y:x*2        // Using variables
 oxidedb> y
 20
 oxidedb> 2.5 + 1.5    // Mixed arithmetic
-4
+4f
 oxidedb> \\           // Q-style exit
 Goodbye!
 ```

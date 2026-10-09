@@ -93,24 +93,26 @@ impl Atom {
     }
 }
 
-/// q-style float display with the default 7 significant digits: the value is
-/// rounded first, so an integral result gets the `f` suffix (`845f`). Magnitudes
-/// >= 1e15 or < 1e-4 use exponent form (`1e+20`, `1e-10`).
+/// q-style float display, equivalent to C `%.7g` (q's default `\P 7`): exponent
+/// form when the decimal exponent is < -4 or >= 7 (`1e-05`, `1.234568e+07`),
+/// otherwise fixed. Trailing zeros are trimmed; an integral fixed result gets
+/// the `f` suffix (`845f`).
 fn write_float(f: &mut fmt::Formatter, fl: f64) -> fmt::Result {
-    let r: f64 = format!("{:.6e}", fl).parse().unwrap_or(fl);
-    let (abs, exp_form) = (r.abs(), r.abs() >= 1e15 || (r != 0.0 && r.abs() < 1e-4));
-    if exp_form {
-        let s = format!("{:e}", r);
-        write!(
+    let sci = format!("{:.6e}", fl);
+    let (mantissa, exp) = sci.split_once('e').unwrap_or((&sci, "0"));
+    let exp: i32 = exp.parse().unwrap_or(0);
+    if !(-4..7).contains(&exp) {
+        let mantissa = mantissa.trim_end_matches('0').trim_end_matches('.');
+        return write!(
             f,
-            "{}",
-            if s.contains("e-") {
-                s
-            } else {
-                s.replace('e', "e+")
-            }
-        )
-    } else if r.fract() == 0.0 && abs < 1e15 {
+            "{}e{}{:02}",
+            mantissa,
+            if exp < 0 { '-' } else { '+' },
+            exp.abs()
+        );
+    }
+    let r: f64 = sci.parse().unwrap_or(fl);
+    if r.fract() == 0.0 {
         write!(f, "{}f", r)
     } else {
         write!(f, "{}", r)

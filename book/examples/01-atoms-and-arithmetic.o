@@ -39,7 +39,7 @@
 // Expected output: 17
 10 + 7
 
-// Expected output: 4
+// Expected output: 4f
 2.5 + 1.5
 
 // Basic Subtraction
@@ -91,7 +91,7 @@
 // Expected output: 7.5
 5 + 2.5
 
-// Expected output: 12
+// Expected output: 12f
 3.0 * 4
 
 // Negative Numbers
