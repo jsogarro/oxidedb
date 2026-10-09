@@ -93,6 +93,30 @@ impl Atom {
     }
 }
 
+/// q-style float display with the default 7 significant digits: the value is
+/// rounded first, so an integral result gets the `f` suffix (`845f`). Magnitudes
+/// >= 1e15 or < 1e-4 use exponent form (`1e+20`, `1e-10`).
+fn write_float(f: &mut fmt::Formatter, fl: f64) -> fmt::Result {
+    let r: f64 = format!("{:.6e}", fl).parse().unwrap_or(fl);
+    let (abs, exp_form) = (r.abs(), r.abs() >= 1e15 || (r != 0.0 && r.abs() < 1e-4));
+    if exp_form {
+        let s = format!("{:e}", r);
+        write!(
+            f,
+            "{}",
+            if s.contains("e-") {
+                s
+            } else {
+                s.replace('e', "e+")
+            }
+        )
+    } else if r.fract() == 0.0 && abs < 1e15 {
+        write!(f, "{}f", r)
+    } else {
+        write!(f, "{}", r)
+    }
+}
+
 impl fmt::Display for Atom {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -102,12 +126,7 @@ impl fmt::Display for Atom {
             Atom::Float(fl) if fl.is_infinite() => {
                 write!(f, "{}0w", if *fl < 0.0 { "-" } else { "" })
             }
-            // Integral floats below 1e15 print as `20f`; larger ones in q-style exponent form.
-            Atom::Float(fl) if fl.fract() == 0.0 && fl.abs() < 1e15 => write!(f, "{}f", fl),
-            Atom::Float(fl) if fl.fract() == 0.0 => {
-                write!(f, "{}", format!("{:e}", fl).replace('e', "e+"))
-            }
-            Atom::Float(fl) => write!(f, "{}", fl),
+            Atom::Float(fl) => write_float(f, *fl),
             Atom::Character(c) => write!(f, "\"{}\"", c),
             Atom::Date(d) => write!(f, "{}", d.format("%Y.%m.%d")),
             Atom::Time(t) => write!(f, "{}", t.format("%H:%M:%S.%3f")),
