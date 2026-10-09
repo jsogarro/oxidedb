@@ -83,15 +83,17 @@ oxidedb> 2.5 * 4
 ```
 
 ### Division (%)
-In O, like Q, division uses the `%` symbol:
+In O, like Q, division uses the `%` symbol and **always returns a float**, even when both operands are integers:
 ```
 oxidedb> 15 % 3
-5
+5f
 oxidedb> 20 % 4
-5
+5f
 oxidedb> 7 % 2
-3
+3.5
 ```
+
+Dividing by zero is not an error; it follows IEEE 754, so `1 % 0` is `0w` (infinity) and `0 % 0` is `0n` (not a number).
 
 ## Right-to-Left Evaluation
 
@@ -120,7 +122,7 @@ Evaluated as: `4 - (2 + 1)` = `4 - 3` = `1`
 
 ```
 oxidedb> 8 % 2 + 2
-2
+2f
 ```
 Evaluated as: `8 % (2 + 2)` = `8 % 4` = `2`
 
@@ -170,7 +172,7 @@ Try these expressions in the REPL and verify your understanding:
 2. `(3 + 4) * 2` (should be 14) 
 3. `10 - 2 * 3` (should be 4)
 4. `5.0 + 3` (should be 8)
-5. `15 % 3 + 2` (should be 3)
+5. `15 % 3 + 2` (should be 3f)
 
 ## Key Takeaways
 
@@ -178,6 +180,6 @@ Try these expressions in the REPL and verify your understanding:
 - O evaluates expressions **right-to-left**
 - Use parentheses to override evaluation order
 - Mixed types are automatically handled
-- Division uses `%` symbol
+- Division uses `%` symbol and always returns a float
 
 In the next chapter, we'll learn how to store values in variables and reuse them in calculations.

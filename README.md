@@ -188,7 +188,7 @@ While O is inspired by Q, there are some important differences:
 
 - **Language Name**: O (instead of Q)
 - **File Extension**: `.o` files (instead of `.q`)
-- **Division Operator**: `%` (same as Q)
+- **Division Operator**: `%` (same as Q): always returns a float, and division by zero follows IEEE 754 (`1%0` is `0w`)
 - **Exit Commands**: `exit`, `quit`, or `\\` (Q standard)
 - **Right-to-Left Evaluation**: Fully implemented like Q
 

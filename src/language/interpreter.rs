@@ -3,6 +3,14 @@ use crate::types::atom::Atom;
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 
+/// i64::MIN is reserved for the long null, so producing it counts as overflow.
+fn checked(result: Option<i64>) -> Result<Atom> {
+    match result {
+        Some(n) if n != i64::MIN => Ok(Atom::Integer(n)),
+        _ => Err(anyhow!("Integer overflow")),
+    }
+}
+
 pub struct Interpreter {
     variables: HashMap<String, Atom>,
 }
@@ -33,8 +41,9 @@ impl Interpreter {
                 operator,
                 right,
             } => {
-                let left_val = self.evaluate(*left)?;
+                // q evaluates right to left, including side effects.
                 let right_val = self.evaluate(*right)?;
+                let left_val = self.evaluate(*left)?;
                 self.apply_binary_op(&left_val, &operator, &right_val)
             }
             Expr::UnaryOp { operator, operand } => {
@@ -52,32 +61,24 @@ impl Interpreter {
     fn apply_binary_op(&self, left: &Atom, op: &BinaryOperator, right: &Atom) -> Result<Atom> {
         match (left, op, right) {
             // Integer arithmetic
-            (Atom::Integer(a), BinaryOperator::Add, Atom::Integer(b)) => Ok(Atom::Integer(a + b)),
+            (Atom::Integer(a), BinaryOperator::Add, Atom::Integer(b)) => checked(a.checked_add(*b)),
             (Atom::Integer(a), BinaryOperator::Subtract, Atom::Integer(b)) => {
-                Ok(Atom::Integer(a - b))
+                checked(a.checked_sub(*b))
             }
             (Atom::Integer(a), BinaryOperator::Multiply, Atom::Integer(b)) => {
-                Ok(Atom::Integer(a * b))
+                checked(a.checked_mul(*b))
             }
+            // `%` is always float division, as in q.
             (Atom::Integer(a), BinaryOperator::Divide, Atom::Integer(b)) => {
-                if *b == 0 {
-                    Err(anyhow!("Division by zero"))
-                } else {
-                    Ok(Atom::Integer(a / b))
-                }
+                Ok(Atom::Float(*a as f64 / *b as f64))
             }
 
             // Float arithmetic (with type promotion)
             (Atom::Float(a), BinaryOperator::Add, Atom::Float(b)) => Ok(Atom::Float(a + b)),
             (Atom::Float(a), BinaryOperator::Subtract, Atom::Float(b)) => Ok(Atom::Float(a - b)),
             (Atom::Float(a), BinaryOperator::Multiply, Atom::Float(b)) => Ok(Atom::Float(a * b)),
-            (Atom::Float(a), BinaryOperator::Divide, Atom::Float(b)) => {
-                if *b == 0.0 {
-                    Err(anyhow!("Division by zero"))
-                } else {
-                    Ok(Atom::Float(a / b))
-                }
-            }
+            // IEEE 754: x%0 is inf or NaN, not an error.
+            (Atom::Float(a), BinaryOperator::Divide, Atom::Float(b)) => Ok(Atom::Float(a / b)),
 
             // Mixed integer/float arithmetic (promote to float)
             (Atom::Integer(a), op, Atom::Float(b)) => {
@@ -98,7 +99,7 @@ impl Interpreter {
 
     fn apply_unary_op(&self, op: &UnaryOperator, operand: &Atom) -> Result<Atom> {
         match (op, operand) {
-            (UnaryOperator::Negate, Atom::Integer(n)) => Ok(Atom::Integer(-n)),
+            (UnaryOperator::Negate, Atom::Integer(n)) => checked(n.checked_neg()),
             (UnaryOperator::Negate, Atom::Float(f)) => Ok(Atom::Float(-f)),
             _ => Err(anyhow!("Invalid unary operation: {:?} {:?}", op, operand)),
         }
