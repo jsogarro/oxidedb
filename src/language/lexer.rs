@@ -59,7 +59,6 @@ pub struct Lexer {
     input: Vec<char>,
     position: usize,
     current_char: Option<char>,
-    prev: Option<Token>,
 }
 
 impl Lexer {
@@ -71,7 +70,6 @@ impl Lexer {
             input: chars,
             position: 0,
             current_char,
-            prev: None,
         }
     }
 
@@ -79,22 +77,19 @@ impl Lexer {
         let mut tokens = Vec::new();
 
         loop {
-            match self.next_token()? {
+            match self.next_token(tokens.last())? {
                 Token::Eof => {
                     tokens.push(Token::Eof);
                     break;
                 }
-                token => {
-                    self.prev = Some(token.clone());
-                    tokens.push(token);
-                }
+                token => tokens.push(token),
             }
         }
 
         Ok(tokens)
     }
 
-    fn next_token(&mut self) -> Result<Token> {
+    fn next_token(&mut self, prev: Option<&Token>) -> Result<Token> {
         self.skip_whitespace();
 
         match self.current_char {
@@ -104,7 +99,7 @@ impl Lexer {
                     self.advance();
                     Ok(Token::Plus)
                 }
-                '-' if self.starts_negative_literal() => self.read_number(),
+                '-' if self.starts_negative_literal(prev) => self.read_number(),
                 '-' => {
                     self.advance();
                     Ok(Token::Minus)
@@ -166,7 +161,7 @@ impl Lexer {
 
     /// q rule: `-` glued to a digit is part of the number at input start or
     /// after a non-noun; after a noun only when preceded by whitespace (`2 -1`).
-    fn starts_negative_literal(&self) -> bool {
+    fn starts_negative_literal(&self, prev: Option<&Token>) -> bool {
         if !self
             .input
             .get(self.position + 1)
@@ -175,7 +170,7 @@ impl Lexer {
             return false;
         }
         let spaced = self.position > 0 && self.input[self.position - 1].is_whitespace();
-        match self.prev {
+        match prev {
             None => true,
             Some(
                 Token::Integer(_)
