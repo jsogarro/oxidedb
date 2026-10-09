@@ -9,6 +9,12 @@ pub struct Repl {
     interpreter: Interpreter,
 }
 
+impl Default for Repl {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Repl {
     pub fn new() -> Self {
         Self {

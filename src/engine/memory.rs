@@ -7,6 +7,12 @@ pub struct MemoryManager {
     _marker: std::marker::PhantomData<()>,
 }
 
+impl Default for MemoryManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MemoryManager {
     pub fn new() -> Self {
         Self {
