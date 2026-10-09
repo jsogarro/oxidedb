@@ -149,7 +149,7 @@ oxidedb> 5 + 2.5
 oxidedb> 3.0 * 4
 12
 oxidedb> 10 % 3.0
-3.3333333333333335
+3.333333
 ```
 
 ## Negative Numbers

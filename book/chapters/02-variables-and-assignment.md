@@ -154,7 +154,7 @@ Error: Undefined variable: undefined_variable
 
 1. Create variables for your name and age, then display them
 2. Calculate the area of a rectangle using width and height variables
-3. Create a temperature in Celsius and convert it to Fahrenheit using the formula: `F = C * 9 % 5 + 32`
+3. Create a temperature in Celsius and convert it to Fahrenheit using the formula: `F = 32 + (C * 9) % 5` (remember right-to-left evaluation; the result is a float, e.g. `77f` for 25)
 4. Try reassigning a variable and verify the new value
 
 ## Key Takeaways

@@ -36,6 +36,7 @@ fn arith_rhs_evaluated_first() {
 fn integer_overflow_is_error() {
     for src in [
         "9223372036854775807+1",
+        "9223372036854775807+2",
         "9223372036854775807*2",
         "(0-9223372036854775807)-2",
         // exactly i64::MIN is reserved for the long null, so it is also an overflow
