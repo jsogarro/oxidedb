@@ -23,7 +23,12 @@ fn parse_strict_probe() {
 /// Asserts that parsing `src` returns `Err` cleanly within 5 seconds.
 fn assert_parse_err(src: &str) {
     let mut child = Command::new(std::env::current_exe().unwrap())
-        .args(["--exact", "parse_strict_probe", "--nocapture", "--test-threads=1"])
+        .args([
+            "--exact",
+            "parse_strict_probe",
+            "--nocapture",
+            "--test-threads=1",
+        ])
         .env(SRC_VAR, src)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
