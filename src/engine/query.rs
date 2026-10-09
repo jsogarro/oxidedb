@@ -1,5 +1,5 @@
-use anyhow::Result;
 use crate::types::table::Table;
+use anyhow::Result;
 
 #[derive(Debug)]
 pub struct QueryEngine {

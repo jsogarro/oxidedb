@@ -1,8 +1,8 @@
+use crate::language::{interpreter::Interpreter, lexer::Lexer, parser::Parser};
 use anyhow::Result;
 use colored::*;
 use rustyline::DefaultEditor;
 use std::fs;
-use crate::language::{lexer::Lexer, parser::Parser, interpreter::Interpreter};
 
 pub struct Repl {
     editor: DefaultEditor,
@@ -31,14 +31,14 @@ impl Repl {
                     if line.is_empty() {
                         continue;
                     }
-                    
-                    if line == "exit" || line == "quit" || line == "\\\\"{
+
+                    if line == "exit" || line == "quit" || line == "\\\\" {
                         println!("Goodbye!");
                         break;
                     }
 
                     let _ = self.editor.add_history_entry(line);
-                    
+
                     match self.evaluate(line) {
                         Ok(result) => println!("{}", result),
                         Err(e) => println!("{}: {}", "Error".red(), e),
@@ -55,15 +55,15 @@ impl Repl {
 
     pub fn run_file(&mut self, filename: &str) -> Result<()> {
         let content = fs::read_to_string(filename)?;
-        
+
         for (line_num, line) in content.lines().enumerate() {
             let line = line.trim();
-            
+
             // Skip empty lines and comments
             if line.is_empty() || line.starts_with("//") {
                 continue;
             }
-            
+
             match self.evaluate(line) {
                 Ok(result) => {
                     println!("{}", result);
@@ -74,17 +74,17 @@ impl Repl {
                 }
             }
         }
-        
+
         Ok(())
     }
 
     fn evaluate(&mut self, input: &str) -> Result<String> {
         let mut lexer = Lexer::new(input);
         let tokens = lexer.tokenize()?;
-        
+
         let mut parser = Parser::new(tokens);
         let ast = parser.parse()?;
-        
+
         let result = self.interpreter.evaluate(ast)?;
         Ok(format!("{}", result))
     }

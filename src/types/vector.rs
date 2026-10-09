@@ -13,7 +13,7 @@ impl Vector {
         } else {
             data[0].type_code()
         };
-        
+
         Self { data, type_code }
     }
 
