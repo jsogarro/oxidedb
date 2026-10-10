@@ -114,7 +114,7 @@ fn lines(bytes: &[u8]) -> Vec<String> {
 #[test]
 fn file_mode_error_line_is_exact_with_file_line_number() {
     // blank and comment lines count: the failing line is line 5 of the file
-    let out = run_file("lineno", b"1+2\n\n/ note\n\n1b+1\n9\n");
+    let out = run_file("lineno", b"1+2\n\n/ note\n\n1+\"a\"\n9\n");
     assert_eq!(out.status.code(), Some(1));
     let e = lines(&out.stderr);
     assert_eq!(e.len(), 2, "stderr: {e:?}");
@@ -144,7 +144,7 @@ fn repl_error_lines_are_exact() {
         .stdin
         .take()
         .unwrap()
-        .write_all(b"1b+1\nnope\n")
+        .write_all(b"1+\"a\"\nnope\n")
         .unwrap();
     let out = child.wait_with_output().unwrap();
     let _ = std::fs::remove_dir_all(&home);
@@ -169,7 +169,7 @@ fn missing_file_names_the_path() {
 #[test]
 fn run_file_error_keeps_qerror_as_source() {
     let path = std::env::temp_dir().join(format!("oxidedb_review_src_{}.o", std::process::id()));
-    std::fs::write(&path, "1b+1\n").unwrap();
+    std::fs::write(&path, "1+\"a\"\n").unwrap();
     let err = oxidedb::repl::Repl::new()
         .run_file(path.to_str().unwrap())
         .unwrap_err();

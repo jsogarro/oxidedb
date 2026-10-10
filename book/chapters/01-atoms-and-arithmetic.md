@@ -96,10 +96,16 @@ oxidedb> 0b
 0b
 ```
 
-Not yet: booleans do not take part in arithmetic. `1b + 1` is an error:
+In arithmetic a boolean counts as a long, `0` or `1`, so the result is a long. With a float the result is a float:
 ```
 oxidedb> 1b + 1
-'type
+2
+oxidedb> 1b + 1b
+2
+oxidedb> 2 * 1b
+2
+oxidedb> 1b + 0.5
+1.5
 ```
 
 ### Characters
@@ -299,7 +305,7 @@ oxidedb> - 5 + 3
 
 O follows q's style for errors: a quote followed by a short name. Some errors add a detail in parentheses or after a colon (`'parse: ...`); q itself does not print `'parse: ...`, the detail is O's addition. Each line below is one kind of error:
 ```
-oxidedb> 1b + 1
+oxidedb> 1 + "a"
 'type
 oxidedb> 9223372036854775807 + 1
 'overflow
@@ -334,7 +340,7 @@ Try these expressions in the REPL and verify your understanding:
 - Atoms are the building blocks: integers, floats, booleans, characters
 - O evaluates expressions **right-to-left**
 - Use parentheses to override evaluation order
-- Integers and floats mix freely; booleans and characters do not take part in arithmetic
+- Integers and floats mix freely, and a boolean counts as `0` or `1` in arithmetic; characters do not take part
 - Integer overflow is an error, not a wrap-around
 - Division uses `%` symbol and always returns a float
 

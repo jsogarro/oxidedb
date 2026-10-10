@@ -68,6 +68,19 @@
 // Expected output: 0b
 0b
 
+// Booleans count as 0 or 1 in arithmetic
+// Expected output: 2
+1b + 1
+
+// Expected output: 2
+1b + 1b
+
+// Expected output: 2
+2 * 1b
+
+// Expected output: 1.5
+1b + 0.5
+
 // Character Values
 // Expected output: "a"
 "a"
