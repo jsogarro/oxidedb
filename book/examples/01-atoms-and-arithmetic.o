@@ -91,6 +91,14 @@
 // Expected output: "Z"
 "Z"
 
+// Octal escape: three digits give one character
+// Expected output: "A"
+"\101"
+
+// Control characters print in octal
+// Expected output: "\001"
+"\001"
+
 // Basic Addition
 // Expected output: 5
 2 + 3
