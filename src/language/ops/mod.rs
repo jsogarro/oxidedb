@@ -17,6 +17,15 @@ pub fn dyad(verb: Verb, left: &Value, right: &Value) -> QResult<Value> {
     }
 }
 
+/// Long null is the i64::MIN sentinel; as a float it is NaN.
+pub(super) fn long_to_float(n: i64) -> f64 {
+    if n == i64::MIN {
+        f64::NAN
+    } else {
+        n as f64
+    }
+}
+
 /// Unary minus, atomic like the arithmetic verbs.
 pub fn monad_neg(v: &Value) -> QResult<Value> {
     arith::neg(v)

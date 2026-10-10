@@ -106,6 +106,8 @@ oxidedb> 2 * 1b
 2
 oxidedb> 1b + 0.5
 1.5
+oxidedb> -1b
+-1
 ```
 
 ### Characters

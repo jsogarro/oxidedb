@@ -319,6 +319,67 @@ fn arith_general_list_recurses() {
     assert_eq!(add(&nested, &lv(&[1, 2, 3])), Err(QError::Length));
 }
 
+// Results are renormalised: same-typed items collapse into a typed vector,
+// whichever list arm produced them.
+#[test]
+fn arith_list_results_collapse_to_vectors() {
+    // list with list
+    assert_eq!(
+        add(&list(vec![l(1), f(2.5)]), &list(vec![f(0.5), l(1)])),
+        Ok(fv(&[1.5, 3.5]))
+    );
+    assert_eq!(
+        add(&list(vec![l(1), l(2)]), &list(vec![l(1), l(2)])),
+        Ok(lv(&[2, 4]))
+    );
+    // list with vector, both orders
+    assert_eq!(
+        add(&list(vec![l(1), f(2.5)]), &fv(&[0.5, 1.0])),
+        Ok(fv(&[1.5, 3.5]))
+    );
+    assert_eq!(
+        add(&fv(&[0.5, 1.0]), &list(vec![l(1), f(2.5)])),
+        Ok(fv(&[1.5, 3.5]))
+    );
+    assert_eq!(add(&list(vec![l(1), l(2)]), &lv(&[1, 2])), Ok(lv(&[2, 4])));
+    assert_eq!(add(&lv(&[1, 2]), &list(vec![l(1), l(2)])), Ok(lv(&[2, 4])));
+    // list with atom, both orders
+    assert_eq!(add(&list(vec![l(1), l(2)]), &l(1)), Ok(lv(&[2, 3])));
+    assert_eq!(add(&l(1), &list(vec![l(1), l(2)])), Ok(lv(&[2, 3])));
+    assert_eq!(
+        add(&l(1), &list(vec![l(1), f(2.0)])),
+        Ok(list(vec![l(2), f(3.0)]))
+    );
+    // mixed long and float items stay general (type 0), as in q ...
+    let mixed = list(vec![l(1), f(2.5)]);
+    assert_eq!(add(&mixed, &l(1)), Ok(list(vec![l(2), f(3.5)])));
+    assert_eq!(add(&mixed, &l(1)).unwrap().type_code(), 0);
+    // ... until the atom is a float
+    assert_eq!(add(&mixed, &f(1.0)), Ok(fv(&[2.0, 3.5])));
+    assert_eq!(add(&f(1.0), &mixed), Ok(fv(&[2.0, 3.5])));
+}
+
+#[test]
+fn arith_overflow_not_at_the_boundary() {
+    let max = i64::MAX;
+    // far past the limit, where a wrapping operation would land on a valid value
+    assert_eq!(add(&lv(&[max, max]), &l(max)), Err(QError::Overflow));
+    assert_eq!(add(&l(max), &lv(&[max, max])), Err(QError::Overflow));
+    assert_eq!(
+        add(&lv(&[max, max]), &lv(&[max, max])),
+        Err(QError::Overflow)
+    );
+    assert_eq!(add(&l(max), &l(max)), Err(QError::Overflow));
+    assert_eq!(add(&l(-max), &l(-max)), Err(QError::Overflow));
+    assert_eq!(sub(&lv(&[-max, -max]), &l(max)), Err(QError::Overflow));
+    assert_eq!(sub(&l(max), &lv(&[-max, -max])), Err(QError::Overflow));
+    assert_eq!(sub(&lv(&[max]), &lv(&[-max])), Err(QError::Overflow));
+    assert_eq!(mul(&lv(&[max, max]), &l(max)), Err(QError::Overflow));
+    assert_eq!(mul(&l(-max), &lv(&[max, max])), Err(QError::Overflow));
+    assert_eq!(mul(&lv(&[1 << 40]), &lv(&[1 << 40])), Err(QError::Overflow));
+    assert_eq!(mul(&l(1 << 40), &l(1 << 40)), Err(QError::Overflow));
+}
+
 #[test]
 fn arith_overflow_in_vector() {
     let max = i64::MAX;
@@ -387,12 +448,19 @@ fn arith_negate() {
     // -(MIN+1) is fine; there is no non-null value whose negation is MIN
     assert_eq!(monad_neg(&lv(&[NULL + 1])), Ok(lv(&[i64::MAX])));
     assert_eq!(monad_neg(&lv(&[i64::MAX])), Ok(lv(&[NULL + 1])));
-    // symbols, chars, temporals and bools are not negatable
+    // a boolean counts as a long, as in the dyadic verbs
+    assert_eq!(monad_neg(&b(true)), Ok(l(-1)));
+    assert_eq!(monad_neg(&b(false)), Ok(l(0)));
+    assert_eq!(monad_neg(&bv(&[true, false])), Ok(lv(&[-1, 0])));
+    assert_eq!(monad_neg(&bv(&[])), Ok(lv(&[])));
+    assert_eq!(
+        monad_neg(&list(vec![b(true), lv(&[2])])),
+        Ok(list(vec![l(-1), lv(&[-2])]))
+    );
+    // symbols, chars and temporals are not negatable
     assert_eq!(monad_neg(&sv(&["a"])), Err(QError::Type));
     assert_eq!(monad_neg(&cv("a")), Err(QError::Type));
     assert_eq!(monad_neg(&sv(&[])), Err(QError::Type));
-    assert_eq!(monad_neg(&bv(&[true])), Err(QError::Type));
-    assert_eq!(monad_neg(&b(true)), Err(QError::Type));
     assert_eq!(monad_neg(&Value::Atom(Atom::NullDate)), Err(QError::Type));
     assert_eq!(monad_neg(&list(vec![l(1), sv(&["a"])])), Err(QError::Type));
 }
@@ -442,6 +510,10 @@ fn arith_through_the_interpreter() {
     assert_eq!(ev("v+1b"), Ok(lv(&[2, 3, 4])));
     assert_eq!(ev("1b+1"), Ok(l(2)));
     assert_eq!(ev("1b+1b"), Ok(l(2)));
+    assert_eq!(ev("-(1b)"), Ok(l(-1)));
+    assert_eq!(ev("- 1b"), Ok(l(-1)));
+    assert_eq!(ev("-1b"), Ok(l(-1)));
+    assert_eq!(ev("0-1b"), Ok(l(-1)));
     assert_eq!(ev("2*1b"), Ok(l(2)));
     assert_eq!(ev("1+\"a\""), Err(QError::Type));
     // right to left: the right operand is evaluated first
