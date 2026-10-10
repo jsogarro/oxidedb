@@ -18,12 +18,14 @@ oxidedb> 0
 ```
 
 ### Floating Point Numbers
-Numbers with decimal places:
+Numbers with decimal places (the leading zero is optional, so `.5` is `0.5`):
 ```
 oxidedb> 3.14159
 3.14159
 oxidedb> -2.5
 -2.5
+oxidedb> .5
+0.5
 oxidedb> 0.0
 0f
 ```
@@ -95,6 +97,17 @@ oxidedb> 7 % 2
 
 Dividing by zero is not an error; it follows IEEE 754, so `1 % 0` is `0w` (infinity) and `0 % 0` is `0n` (not a number).
 
+The `/` character is **not** division. After a space it starts a comment, so everything from it to the end of the line is ignored; glued to the previous token it is the *over* adverb, which O does not implement yet:
+```
+oxidedb> 6 / 2
+6
+oxidedb> 6/2
+Error: adverb '/' not yet implemented
+oxidedb> 6 % 2
+3f
+```
+To divide, always use `%`.
+
 ## Right-to-Left Evaluation
 
 **This is crucial**: O evaluates expressions from right to left, unlike most programming languages. This means operations are applied in the order they appear when reading from right to left.
@@ -162,6 +175,22 @@ oxidedb> -3.14
 -3.14
 oxidedb> -5 + 3
 -2
+```
+
+A minus applied to an expression (rather than glued to a number) negates everything to its right, so `-x+3` is `-(x+3)`:
+```
+oxidedb> x:2
+2
+oxidedb> -x+3
+-5
+```
+
+A minus glued to a digit is part of the number, so `-5 + 3` is `-2`; with a space, `- 5 + 3` applies the minus to `5 + 3` and gives `-8`:
+```
+oxidedb> -5 + 3
+-2
+oxidedb> - 5 + 3
+-8
 ```
 
 ## Exercises

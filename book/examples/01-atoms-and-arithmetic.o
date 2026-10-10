@@ -18,6 +18,10 @@
 // Expected output: -2.5
 -2.5
 
+// Leading-dot float and a trailing comment
+// Expected output: 0.5
+.5 / the zero before the dot is optional
+
 // Boolean Values
 // Expected output: 1b
 1b
@@ -116,3 +120,9 @@
 
 // Expected output: 3f (evaluated as 15 % (3 + 2) = 15 % 5 = 3)
 15 % 3 + 2
+// A minus glued to a digit is part of the number; with a space it negates everything to its right
+// Expected output: -2
+-5 + 3
+
+// Expected output: -8
+- 5 + 3

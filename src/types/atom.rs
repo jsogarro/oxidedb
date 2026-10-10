@@ -1,3 +1,4 @@
+use super::sym::Sym;
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use std::fmt;
 
@@ -15,45 +16,38 @@ pub enum Atom {
     Timestamp(DateTime<Utc>),
 
     // String/Symbol
-    Symbol(String),
+    Symbol(Sym),
 
-    // Null values for each type
-    NullBoolean,
-    NullInteger,
-    NullFloat,
-    NullCharacter,
+    // Typed temporal nulls. Long/float/char/symbol nulls are sentinels:
+    // `Integer(i64::MIN)`, `Float(NaN)`, `Character(' ')`, `Symbol(Sym::NULL)`.
     NullDate,
     NullTime,
     NullTimestamp,
-    NullSymbol,
 }
 
 impl Atom {
     pub fn type_code(&self) -> i8 {
         match self {
-            Atom::Boolean(_) | Atom::NullBoolean => -1,
-            Atom::Integer(_) | Atom::NullInteger => -7,
-            Atom::Float(_) | Atom::NullFloat => -9,
-            Atom::Character(_) | Atom::NullCharacter => -10,
+            Atom::Boolean(_) => -1,
+            Atom::Integer(_) => -7,
+            Atom::Float(_) => -9,
+            Atom::Character(_) => -10,
             Atom::Date(_) | Atom::NullDate => -14,
             Atom::Time(_) | Atom::NullTime => -19,
             Atom::Timestamp(_) | Atom::NullTimestamp => -12,
-            Atom::Symbol(_) | Atom::NullSymbol => -11,
+            Atom::Symbol(_) => -11,
         }
     }
 
     pub fn is_null(&self) -> bool {
-        matches!(
-            self,
-            Atom::NullBoolean
-                | Atom::NullInteger
-                | Atom::NullFloat
-                | Atom::NullCharacter
-                | Atom::NullDate
-                | Atom::NullTime
-                | Atom::NullTimestamp
-                | Atom::NullSymbol
-        )
+        match self {
+            Atom::Integer(i) => *i == i64::MIN,
+            Atom::Float(f) => f.is_nan(),
+            Atom::Character(c) => *c == ' ',
+            Atom::Symbol(s) => *s == Sym::NULL,
+            Atom::NullDate | Atom::NullTime | Atom::NullTimestamp => true,
+            Atom::Boolean(_) | Atom::Date(_) | Atom::Time(_) | Atom::Timestamp(_) => false,
+        }
     }
 
     pub fn as_boolean(&self) -> Option<bool> {
@@ -87,7 +81,7 @@ impl Atom {
 
     pub fn as_symbol(&self) -> Option<&str> {
         match self {
-            Atom::Symbol(s) => Some(s),
+            Atom::Symbol(s) => Some(s.as_str()),
             _ => None,
         }
     }
@@ -123,6 +117,7 @@ impl fmt::Display for Atom {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Atom::Boolean(b) => write!(f, "{}", if *b { "1b" } else { "0b" }),
+            Atom::Integer(i64::MIN) => write!(f, "0N"),
             Atom::Integer(i) => write!(f, "{}", i),
             Atom::Float(fl) if fl.is_nan() => write!(f, "0n"),
             Atom::Float(fl) if fl.is_infinite() => {
@@ -132,16 +127,11 @@ impl fmt::Display for Atom {
             Atom::Character(c) => write!(f, "\"{}\"", c),
             Atom::Date(d) => write!(f, "{}", d.format("%Y.%m.%d")),
             Atom::Time(t) => write!(f, "{}", t.format("%H:%M:%S.%3f")),
-            Atom::Timestamp(ts) => write!(f, "{}", ts.format("%Y.%m.%dT%H:%M:%S.%3fZ")),
-            Atom::Symbol(s) => write!(f, "`{}", s),
-            Atom::NullBoolean => write!(f, "0Nb"),
-            Atom::NullInteger => write!(f, "0N"),
-            Atom::NullFloat => write!(f, "0n"),
-            Atom::NullCharacter => write!(f, "\" \""),
+            Atom::Timestamp(ts) => write!(f, "{}", ts.format("%Y.%m.%dD%H:%M:%S.%9f")),
+            Atom::Symbol(s) => write!(f, "{}", s),
             Atom::NullDate => write!(f, "0Nd"),
             Atom::NullTime => write!(f, "0Nt"),
             Atom::NullTimestamp => write!(f, "0Np"),
-            Atom::NullSymbol => write!(f, "`"),
         }
     }
 }
@@ -172,12 +162,12 @@ impl From<char> for Atom {
 
 impl From<String> for Atom {
     fn from(s: String) -> Self {
-        Atom::Symbol(s)
+        Atom::Symbol(Sym::intern(&s))
     }
 }
 
 impl From<&str> for Atom {
     fn from(s: &str) -> Self {
-        Atom::Symbol(s.to_string())
+        Atom::Symbol(Sym::intern(s))
     }
 }

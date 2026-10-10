@@ -151,3 +151,9 @@ fahrenheit_float:celsius_float*ratio_float+32
 
 // Expected output: 676f
 fahrenheit_float
+// A minus applied to a variable negates everything to its right: -x+3 is -(x+3)
+// Expected output: 2
+neg_x:2
+
+// Expected output: -5
+-neg_x+3

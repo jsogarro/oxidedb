@@ -1,7 +1,8 @@
-use crate::language::{interpreter::Interpreter, lexer::Lexer, parser::Parser};
+use crate::language::interpreter::Interpreter;
 use anyhow::Result;
 use colored::*;
 use rustyline::{error::ReadlineError, DefaultEditor};
+use std::io::IsTerminal;
 use std::{fs, path::PathBuf};
 
 pub struct Repl {
@@ -23,8 +24,11 @@ impl Repl {
         }
     }
 
-    /// History file in the user's home directory, if `$HOME` is set.
+    /// History file in the user's home directory, only for interactive sessions.
     fn history_path() -> Option<PathBuf> {
+        if !std::io::stdin().is_terminal() {
+            return None;
+        }
         std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".oxidedb_history"))
     }
 
@@ -49,7 +53,8 @@ impl Repl {
                     let _ = self.editor.add_history_entry(line);
 
                     match self.eval_line(line) {
-                        Ok(result) => println!("{}", result),
+                        Ok(Some(result)) => println!("{}", result),
+                        Ok(None) => {}
                         Err(e) => eprintln!("{}: {}", "Error".red(), e),
                     }
                 }
@@ -76,29 +81,23 @@ impl Repl {
 
         for (line_num, line) in content.lines().enumerate() {
             let line = line.trim();
-
-            // Skip empty lines and comments
-            if line.is_empty() || line.starts_with("//") {
+            if line.is_empty() {
                 continue;
             }
 
             let result = self
                 .eval_line(line)
                 .map_err(|e| anyhow::anyhow!("at line {}: {}", line_num + 1, e))?;
-            println!("{}", result);
+            if let Some(result) = result {
+                println!("{}", result);
+            }
         }
 
         Ok(())
     }
 
-    pub fn eval_line(&mut self, input: &str) -> Result<String> {
-        let mut lexer = Lexer::new(input);
-        let tokens = lexer.tokenize()?;
-
-        let mut parser = Parser::new(tokens);
-        let ast = parser.parse()?;
-
-        let result = self.interpreter.evaluate(ast)?;
-        Ok(format!("{}", result))
+    /// Evaluates one line; `None` for input with no tokens (e.g. a comment).
+    pub fn eval_line(&mut self, input: &str) -> Result<Option<String>> {
+        Ok(self.interpreter.eval_line(input)?.map(|a| a.to_string()))
     }
 }
