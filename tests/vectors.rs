@@ -296,10 +296,14 @@ fn vec_lit_glued_letters_are_invalid_literals() {
 }
 
 #[test]
-fn vec_lit_parenthesised_semicolon_is_general_lists_nyi() {
-    let nyi = Err(QError::Nyi("general lists".into()));
-    for src in ["(1;2;3)", "()", "(1 2;3)", "(1;)", "(;)", "(;1)", "(;;)"] {
+fn vec_lit_parenthesised_semicolon_builds_lists_and_elided_items_are_nyi() {
+    // general lists exist now (tests/general_lists.rs); only elided items are still nyi
+    let nyi = Err(QError::Nyi("elided list item".into()));
+    for src in ["(1;)", "(;)", "(;1)", "(;;)", "(1;;2)"] {
         assert_eq!(eval(src), nyi, "{src}");
+    }
+    for src in ["(1;2;3)", "()", "(1 2;3)"] {
+        assert!(eval(src).is_ok(), "{src}");
     }
 }
 

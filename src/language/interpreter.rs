@@ -74,6 +74,19 @@ impl Interpreter {
                     UnaryOperator::Negate => ops::monad_neg(&val),
                 }
             }
+            Expr::List(items) => {
+                // right to left, like every other construct
+                let mut vals = Vec::with_capacity(items.len());
+                for item in items.into_iter().rev() {
+                    vals.push(self.evaluate(item)?);
+                }
+                vals.reverse();
+                {
+                    let list = Value::from_items(vals);
+                    list.check_nesting(0)?;
+                    Ok(list)
+                }
+            }
             Expr::Assignment { name, value } => {
                 let val = self.evaluate(*value)?;
                 self.variables.insert(name, val.clone());

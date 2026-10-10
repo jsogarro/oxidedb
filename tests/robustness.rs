@@ -13,6 +13,8 @@ fn operand() -> impl Strategy<Value = String> {
             "til 3", "count til 4", "neg 1 2", "1 2 3[1]", "(1 2 3)[0 5]", "til[2]", "count[1;2]",
             "1 2 3 1", "\"abc\" 0 7", "x[0]:1", "x[1 9]:2", "(x)[0]:x[1]:5", "x[0]+:1", "x[0][0]:1", "neg 0N", "til -1", "til 0N", "`a",
             "\"abc\"", "1 1b", "1 \"a\"", "1f 2", "1 2 3f", "1 2 + 3 4",
+            "(1;`a;2.5)", "()", "(1 2;3 4)", "(1;(2;3))", "enlist 1 2", "enlist 1", "(1;;2)",
+            "enlist[1;2]", "(1 2;(3;`a))", "((1;`a);(2;`b))", "(1;`a)[5]", "(1;`a) 0 5",
         ][..]).prop_map(String::from),
         2 => prop::sample::select(&["a", "é", "_", "x1", "日本"][..]).prop_map(String::from),
     ]
@@ -140,9 +142,47 @@ proptest! {
 }
 
 const APPLY: &[&str] = &[
-    "til", "count", "neg", "x", "v", "1", "0", "-1", "1 2", "0N", "`a", "\"ab\"", "101b", "3.5",
-    "(", ")", "[", "]", ";", "+", "-", "=", ",", ":", "x:", "v:1 2 3", "v[0]:", "v[0 1]:", "v[9]:",
-    "v[-1]:", "v[0N]:", "v[101b]:", "x[0]:", "w[0]:", "v[0]+:",
+    "til",
+    "count",
+    "neg",
+    "x",
+    "v",
+    "1",
+    "0",
+    "-1",
+    "1 2",
+    "0N",
+    "`a",
+    "\"ab\"",
+    "101b",
+    "3.5",
+    "(",
+    ")",
+    "[",
+    "]",
+    ";",
+    "+",
+    "-",
+    "=",
+    ",",
+    ":",
+    "x:",
+    "v:1 2 3",
+    "v[0]:",
+    "v[0 1]:",
+    "v[9]:",
+    "v[-1]:",
+    "v[0N]:",
+    "v[101b]:",
+    "x[0]:",
+    "w[0]:",
+    "v[0]+:",
+    "enlist",
+    "l",
+    "()",
+    "(1;`a)",
+    "(1 2;3 4)",
+    "l:(1;`a;2.5)",
 ];
 
 proptest! {
@@ -162,6 +202,7 @@ proptest! {
         let mut interp = Interpreter::new();
         let _ = interp.eval_line("v:10 20 30");
         let _ = interp.eval_line("x:5");
+        let _ = interp.eval_line("l:(1;`a;2.5)");
         let toks: Vec<&str> = v.iter().map(|&i| APPLY[i]).collect();
         if let Ok(Some(value)) = interp.eval_line(&toks.join(" ")) {
             let _ = value.to_string();
@@ -227,6 +268,37 @@ proptest! {
         for name in ["v", "x", "s", "l", "w"] {
             if let Some(value) = interp.get(name) {
                 let _ = value.to_string();
+            }
+        }
+    }
+}
+
+// Random nested lists: build, display, index (in and out of range) and join; never a panic.
+fn list_source() -> impl Strategy<Value = String> {
+    let leaf = prop::sample::select(
+        &[
+            "1", "`a", "2.5", "\"x\"", "1b", "1 2", "`a`b", "\"ab\"", "0N", "()", "10b", "0n 1",
+        ][..],
+    )
+    .prop_map(String::from);
+    leaf.prop_recursive(4, 32, 5, |inner| {
+        prop_oneof![
+            4 => prop::collection::vec(inner.clone(), 0..=5)
+                .prop_map(|v| if v.is_empty() { "()".to_string() } else { format!("({};{})", v[0], v[1..].join(";")) }),
+            1 => inner.prop_map(|s| format!("(enlist {s})")),
+        ]
+    })
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(1024))]
+
+    #[test]
+    fn nested_lists_never_panic(src in list_source(), idx in prop::sample::select(&["0", "1", "-1", "7", "0 1", "1 0 9", "()", "(0;1)", "1b"][..])) {
+        let mut interp = Interpreter::new();
+        for line in [format!("l:{src}"), "l".to_string(), format!("l {idx}"), format!("l[{idx}]"), "count l".to_string(), "l,l".to_string(), "2#l".to_string(), "l=l".to_string(), "neg l".to_string(), "l+1".to_string()] {
+            if let Ok(Some(v)) = interp.eval_line(&line) {
+                let _ = v.to_string();
             }
         }
     }
