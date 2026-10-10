@@ -113,6 +113,14 @@ oxidedb> "5"
 "5"
 ```
 
+A backslash escapes the next character: `\n`, `\t`, `\r`, `\\` and `\"` each give a single character, and the REPL prints them in the same escaped form:
+```
+oxidedb> "\n"
+"\n"
+oxidedb> "\""
+"\""
+```
+
 ## Basic Arithmetic Operations
 
 O supports the four fundamental arithmetic operations:

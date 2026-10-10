@@ -107,6 +107,8 @@ pub struct Lexer {
     input: Vec<char>,
     position: usize,
     current_char: Option<char>,
+    /// Source span of the last literal token, to catch a literal glued to the next.
+    last_literal: Option<(usize, usize)>,
 }
 
 impl Lexer {
@@ -118,6 +120,7 @@ impl Lexer {
             input: chars,
             position: 0,
             current_char,
+            last_literal: None,
         }
     }
 
@@ -137,9 +140,46 @@ impl Lexer {
         Ok(tokens)
     }
 
+    /// Like `lex_token`, but a literal must not run straight into another one
+    /// (`1.5.5`, `"ab""cd"`, `1"ab"`): later slices join juxtaposed literals
+    /// into vectors, so glued ones are rejected here.
     fn next_token(&mut self, prev: Option<&Token>) -> QResult<Token> {
         self.skip_whitespace();
+        let start = self.position;
+        let glued_from = self
+            .last_literal
+            .filter(|&(_, end)| end == start && self.starts_literal())
+            .map(|(from, _)| from);
+        let token = self.lex_token(prev)?;
+        if let Some(from) = glued_from {
+            let text: String = self.input[from..start].iter().collect();
+            return Err(QError::parse(format!("invalid literal: {text}...")));
+        }
+        self.last_literal = matches!(
+            token,
+            Token::Integer(_)
+                | Token::Float(_)
+                | Token::Boolean(_)
+                | Token::Character(_)
+                | Token::Sym(_)
+                | Token::SymList(_)
+                | Token::Str(_)
+                | Token::BoolList(_)
+        )
+        .then_some((start, self.position));
+        Ok(token)
+    }
 
+    fn starts_literal(&self) -> bool {
+        match self.current_char {
+            Some(c) => {
+                c.is_ascii_digit() || matches!(c, '"' | '`') || (c == '.' && self.next_is_digit())
+            }
+            None => false,
+        }
+    }
+
+    fn lex_token(&mut self, prev: Option<&Token>) -> QResult<Token> {
         match self.current_char {
             None => Ok(Token::Eof),
             Some(ch) => match ch {
@@ -199,7 +239,7 @@ impl Lexer {
                 ch if ch.is_ascii_digit() => self.read_number(),
                 ch if ch.is_ascii_alphabetic() => self.read_identifier(),
                 ch if ch.is_alphanumeric() || ch == '_' => Err(bad_identifier_char(ch)),
-                '`' => Ok(self.read_symbols()),
+                '`' => self.read_symbols(),
                 _ => Err(QError::parse(format!("unexpected character: {ch}"))),
             },
         }
@@ -249,7 +289,7 @@ impl Lexer {
                 .input
                 .get(self.position + 2)
                 .is_some_and(char::is_ascii_digit);
-        if !(next.is_some_and(char::is_ascii_digit) || dot_digit) {
+        if !(next.is_some_and(char::is_ascii_digit) || dot_digit) || self.bool_literal_at(1) {
             return false;
         }
         let spaced = self.position > 0 && self.input[self.position - 1].is_whitespace();
@@ -270,6 +310,14 @@ impl Lexer {
             ) => spaced,
             Some(_) => true,
         }
+    }
+
+    /// True when the digits starting `offset` ahead are a boolean literal
+    /// (`1b`, `101b`), so a minus before them stays an operator.
+    fn bool_literal_at(&self, offset: usize) -> bool {
+        let rest = &self.input[self.position + offset..];
+        let digits = rest.iter().take_while(|c| c.is_ascii_digit()).count();
+        rest.get(digits) == Some(&'b') && !rest.get(digits + 1).is_some_and(|c| is_ident_char(*c))
     }
 
     fn read_number(&mut self) -> QResult<Token> {
@@ -375,6 +423,11 @@ impl Lexer {
             self.advance();
         }
 
+        // A `b` that did not make a boolean literal (`2b`, `1.0b`, `1e3b`).
+        if self.current_char == Some('b') && !self.ident_char_at(1) {
+            return Err(QError::parse(format!("invalid literal: {number}b...")));
+        }
+
         if is_float {
             let value = number
                 .parse::<f64>()
@@ -407,7 +460,7 @@ impl Lexer {
     }
 
     /// `` `a ``, `` ` `` or a glued run `` `a`b ``; the lexer is on a backtick.
-    fn read_symbols(&mut self) -> Token {
+    fn read_symbols(&mut self) -> QResult<Token> {
         let mut names = Vec::new();
         while self.current_char == Some('`') {
             self.advance();
@@ -421,11 +474,16 @@ impl Lexer {
             }
             names.push(name);
         }
-        if names.len() == 1 {
+        if let Some(ch) = self.current_char.filter(|c| c.is_alphanumeric()) {
+            return Err(QError::parse(format!(
+                "invalid symbol: non-ASCII character '{ch}'; symbol names are ASCII letters, digits, '_' and '.'"
+            )));
+        }
+        Ok(if names.len() == 1 {
             Token::Sym(names.remove(0))
         } else {
             Token::SymList(names)
-        }
+        })
     }
 
     /// `"c"` is a character, anything else between quotes a string. A `\` escape
@@ -433,13 +491,8 @@ impl Lexer {
     fn read_character(&mut self) -> QResult<Token> {
         self.advance(); // Skip opening quote
 
-        // `""` is the empty string; `"""` stays the quote character.
         if self.current_char == Some('"') {
             self.advance();
-            if self.current_char == Some('"') {
-                self.advance();
-                return Ok(Token::Character('"'));
-            }
             return Ok(Token::Str(String::new()));
         }
 
