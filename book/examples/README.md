@@ -30,7 +30,8 @@ The O interpreter will:
 - Skip comment lines and empty lines
 - Execute each O expression line by line
 - Display the result of each expression
-- Stop execution if an error occurs
+- Stop at the first error: it is reported once on stderr (with the line number) and the exit status is 1
+- Write the banner to stderr, so stdout contains only results (and a leading UTF-8 BOM is ignored)
 
 ## Example Output
 

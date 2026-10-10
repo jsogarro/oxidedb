@@ -1,8 +1,8 @@
 use crate::language::{interpreter::Interpreter, lexer::Lexer, parser::Parser};
 use anyhow::Result;
 use colored::*;
-use rustyline::DefaultEditor;
-use std::fs;
+use rustyline::{error::ReadlineError, DefaultEditor};
+use std::{fs, path::PathBuf};
 
 pub struct Repl {
     editor: DefaultEditor,
@@ -23,7 +23,16 @@ impl Repl {
         }
     }
 
+    /// History file in the user's home directory, if `$HOME` is set.
+    fn history_path() -> Option<PathBuf> {
+        std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".oxidedb_history"))
+    }
+
     pub fn run(&mut self) -> Result<()> {
+        let history = Self::history_path();
+        if let Some(p) = &history {
+            let _ = self.editor.load_history(p); // missing file is fine
+        }
         loop {
             match self.editor.readline("oxidedb> ") {
                 Ok(line) => {
@@ -39,22 +48,31 @@ impl Repl {
 
                     let _ = self.editor.add_history_entry(line);
 
-                    match self.evaluate(line) {
+                    match self.eval_line(line) {
                         Ok(result) => println!("{}", result),
-                        Err(e) => println!("{}: {}", "Error".red(), e),
+                        Err(e) => eprintln!("{}: {}", "Error".red(), e),
                     }
                 }
+                // Ctrl-C cancels the current line; the session continues.
+                Err(ReadlineError::Interrupted) => continue,
+                // Ctrl-D (Eof) and any other failure end the session.
                 Err(_) => {
                     println!("Goodbye!");
                     break;
                 }
             }
         }
+        if let Some(p) = &history {
+            let _ = self.editor.save_history(p); // unwritable is fine
+        }
         Ok(())
     }
 
+    /// Runs a file; the first failing line aborts with an error naming the line.
+    /// The caller reports the error (once).
     pub fn run_file(&mut self, filename: &str) -> Result<()> {
         let content = fs::read_to_string(filename)?;
+        let content = content.strip_prefix('\u{feff}').unwrap_or(&content);
 
         for (line_num, line) in content.lines().enumerate() {
             let line = line.trim();
@@ -64,21 +82,16 @@ impl Repl {
                 continue;
             }
 
-            match self.evaluate(line) {
-                Ok(result) => {
-                    println!("{}", result);
-                }
-                Err(e) => {
-                    eprintln!("{} at line {}: {}", "Error".red(), line_num + 1, e);
-                    return Err(e);
-                }
-            }
+            let result = self
+                .eval_line(line)
+                .map_err(|e| anyhow::anyhow!("at line {}: {}", line_num + 1, e))?;
+            println!("{}", result);
         }
 
         Ok(())
     }
 
-    fn evaluate(&mut self, input: &str) -> Result<String> {
+    pub fn eval_line(&mut self, input: &str) -> Result<String> {
         let mut lexer = Lexer::new(input);
         let tokens = lexer.tokenize()?;
 
