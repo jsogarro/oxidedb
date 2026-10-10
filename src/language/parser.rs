@@ -9,6 +9,17 @@ fn adverb_nyi(token: &Token) -> QError {
     QError::Nyi(format!("adverb '{}'", token))
 }
 
+/// Lexed list literals the parser cannot evaluate yet.
+fn literal_nyi(token: &Token) -> Option<QError> {
+    let detail = match token {
+        Token::Str(_) => "strings (a character literal holds exactly one character)",
+        Token::Sym(_) | Token::SymList(_) => "symbols",
+        Token::BoolList(_) => "boolean lists",
+        _ => return None,
+    };
+    Some(QError::Nyi(detail.into()))
+}
+
 pub struct Parser {
     tokens: Vec<Token>,
     current: usize,
@@ -37,6 +48,9 @@ impl Parser {
         if !self.is_at_end() {
             if matches!(self.peek(), Token::Over | Token::Scan) {
                 return Err(adverb_nyi(self.peek()));
+            }
+            if let Some(err) = literal_nyi(self.peek()) {
+                return Err(err);
             }
             return Err(QError::parse(format!(
                 "unexpected {} after expression",
@@ -150,7 +164,8 @@ impl Parser {
                 Ok(expr)
             }
             token @ (Token::Over | Token::Scan) => Err(adverb_nyi(token)),
-            token => Err(QError::parse(format!("unexpected {}", token))),
+            token => Err(literal_nyi(token)
+                .unwrap_or_else(|| QError::parse(format!("unexpected {}", token)))),
         }
     }
 

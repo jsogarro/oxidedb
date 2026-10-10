@@ -1,5 +1,4 @@
 //! Error wording, kinds and exact output channels (review follow-ups).
-use oxidedb::language::lexer::Token;
 use oxidedb::{Interpreter, Lexer, QError};
 use std::io::Write;
 use std::process::{Command, Output, Stdio};
@@ -63,17 +62,14 @@ fn terminated_strings_are_not_yet_implemented() {
 }
 
 #[test]
-fn triple_quote_is_still_a_quote_character() {
-    assert_eq!(
-        Lexer::new("\"\"\"").tokenize().unwrap(),
-        vec![Token::Character('"'), Token::Eof]
-    );
+fn triple_quote_is_an_unterminated_literal() {
+    assert_eq!(lex_err("\"\"\""), parse("unterminated character literal"));
 }
 
 #[test]
 fn symbols_are_not_yet_implemented() {
-    assert_eq!(lex_err("`a"), QError::Nyi("symbols".into()));
-    assert_eq!(lex_err("`a").to_string(), "'nyi: symbols");
+    assert_eq!(eval_err("`a"), QError::Nyi("symbols".into()));
+    assert_eq!(eval_err("`a").to_string(), "'nyi: symbols");
 }
 
 #[test]
