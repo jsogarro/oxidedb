@@ -1,10 +1,11 @@
 use crate::error::{QError, QResult};
-use crate::language::ast::{BinaryOperator, Expr, UnaryOperator};
+use crate::language::ast::{Expr, UnaryOperator, Verb};
 use crate::language::{
     lexer::{Lexer, Token},
     parser::Parser,
 };
 use crate::types::atom::Atom;
+use crate::types::value::Value;
 use std::collections::HashMap;
 
 /// i64::MIN is reserved for the long null, so producing it counts as overflow.
@@ -25,7 +26,7 @@ fn long_to_float(n: i64) -> f64 {
 }
 
 pub struct Interpreter {
-    variables: HashMap<String, Atom>,
+    variables: HashMap<String, Value>,
 }
 
 impl Default for Interpreter {
@@ -43,7 +44,7 @@ impl Interpreter {
 
     /// Lex, parse and evaluate one line. `None` means the line had no tokens
     /// (e.g. blank or comment-only).
-    pub fn eval_line(&mut self, input: &str) -> QResult<Option<Atom>> {
+    pub fn eval_line(&mut self, input: &str) -> QResult<Option<Value>> {
         let tokens = Lexer::new(input).tokenize()?;
         if tokens == [Token::Eof] {
             return Ok(None);
@@ -52,9 +53,18 @@ impl Interpreter {
         self.evaluate(ast).map(Some)
     }
 
-    pub fn evaluate(&mut self, expr: Expr) -> QResult<Atom> {
+    /// Bind `name` to `value`, as `name:value` would.
+    pub fn set(&mut self, name: &str, value: Value) {
+        self.variables.insert(name.to_string(), value);
+    }
+
+    pub fn get(&self, name: &str) -> Option<&Value> {
+        self.variables.get(name)
+    }
+
+    pub fn evaluate(&mut self, expr: Expr) -> QResult<Value> {
         match expr {
-            Expr::Atom(atom) => Ok(atom),
+            Expr::Atom(atom) => Ok(Value::Atom(atom)),
             Expr::Symbol(name) => self
                 .variables
                 .get(&name)
@@ -68,11 +78,20 @@ impl Interpreter {
                 // q evaluates right to left, including side effects.
                 let right_val = self.evaluate(*right)?;
                 let left_val = self.evaluate(*left)?;
-                self.apply_binary_op(&left_val, &operator, &right_val)
+                match (&left_val, &right_val) {
+                    (Value::Atom(l), Value::Atom(r)) => {
+                        self.apply_binary_op(l, &operator, r).map(Value::Atom)
+                    }
+                    // ponytail: vector arithmetic arrives with the kernel (#47).
+                    _ => Err(QError::Nyi("vector arithmetic".into())),
+                }
             }
             Expr::UnaryOp { operator, operand } => {
                 let val = self.evaluate(*operand)?;
-                self.apply_unary_op(&operator, &val)
+                match &val {
+                    Value::Atom(a) => self.apply_unary_op(&operator, a).map(Value::Atom),
+                    _ => Err(QError::Nyi("vector arithmetic".into())),
+                }
             }
             Expr::Assignment { name, value } => {
                 let val = self.evaluate(*value)?;
@@ -82,33 +101,42 @@ impl Interpreter {
         }
     }
 
-    fn apply_binary_op(&self, left: &Atom, op: &BinaryOperator, right: &Atom) -> QResult<Atom> {
+    fn apply_binary_op(&self, left: &Atom, op: &Verb, right: &Atom) -> QResult<Atom> {
         match (left, op, right) {
-            // A long null operand yields a long null (`%` is float, handled below).
             (
-                Atom::Integer(a),
-                BinaryOperator::Add | BinaryOperator::Subtract | BinaryOperator::Multiply,
-                Atom::Integer(b),
-            ) if *a == i64::MIN || *b == i64::MIN => Ok(Atom::Integer(i64::MIN)),
+                _,
+                Verb::Equal
+                | Verb::Less
+                | Verb::Greater
+                | Verb::NotEqual
+                | Verb::LessEqual
+                | Verb::GreaterEqual
+                | Verb::Take
+                | Verb::Join
+                | Verb::Key,
+                _,
+            ) => Err(QError::Nyi(op.symbol().into())),
+            // A long null operand yields a long null (`%` is float, handled below).
+            (Atom::Integer(a), Verb::Add | Verb::Subtract | Verb::Multiply, Atom::Integer(b))
+                if *a == i64::MIN || *b == i64::MIN =>
+            {
+                Ok(Atom::Integer(i64::MIN))
+            }
             // Integer arithmetic
-            (Atom::Integer(a), BinaryOperator::Add, Atom::Integer(b)) => checked(a.checked_add(*b)),
-            (Atom::Integer(a), BinaryOperator::Subtract, Atom::Integer(b)) => {
-                checked(a.checked_sub(*b))
-            }
-            (Atom::Integer(a), BinaryOperator::Multiply, Atom::Integer(b)) => {
-                checked(a.checked_mul(*b))
-            }
+            (Atom::Integer(a), Verb::Add, Atom::Integer(b)) => checked(a.checked_add(*b)),
+            (Atom::Integer(a), Verb::Subtract, Atom::Integer(b)) => checked(a.checked_sub(*b)),
+            (Atom::Integer(a), Verb::Multiply, Atom::Integer(b)) => checked(a.checked_mul(*b)),
             // `%` is always float division, as in q.
-            (Atom::Integer(a), BinaryOperator::Divide, Atom::Integer(b)) => {
+            (Atom::Integer(a), Verb::Divide, Atom::Integer(b)) => {
                 Ok(Atom::Float(long_to_float(*a) / long_to_float(*b)))
             }
 
             // Float arithmetic (with type promotion)
-            (Atom::Float(a), BinaryOperator::Add, Atom::Float(b)) => Ok(Atom::Float(a + b)),
-            (Atom::Float(a), BinaryOperator::Subtract, Atom::Float(b)) => Ok(Atom::Float(a - b)),
-            (Atom::Float(a), BinaryOperator::Multiply, Atom::Float(b)) => Ok(Atom::Float(a * b)),
+            (Atom::Float(a), Verb::Add, Atom::Float(b)) => Ok(Atom::Float(a + b)),
+            (Atom::Float(a), Verb::Subtract, Atom::Float(b)) => Ok(Atom::Float(a - b)),
+            (Atom::Float(a), Verb::Multiply, Atom::Float(b)) => Ok(Atom::Float(a * b)),
             // IEEE 754: x%0 is inf or NaN, not an error.
-            (Atom::Float(a), BinaryOperator::Divide, Atom::Float(b)) => Ok(Atom::Float(a / b)),
+            (Atom::Float(a), Verb::Divide, Atom::Float(b)) => Ok(Atom::Float(a / b)),
 
             // Mixed integer/float arithmetic (promote to float)
             (Atom::Integer(a), op, Atom::Float(b)) => {

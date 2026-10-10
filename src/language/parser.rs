@@ -1,6 +1,6 @@
 use crate::error::{QError, QResult};
 use crate::language::{
-    ast::{BinaryOperator, Expr, UnaryOperator},
+    ast::{Expr, UnaryOperator, Verb},
     lexer::Token,
 };
 use crate::types::atom::Atom;
@@ -96,10 +96,10 @@ impl Parser {
                 break;
             }
             operators.push(match self.previous() {
-                Token::Plus => BinaryOperator::Add,
-                Token::Minus => BinaryOperator::Subtract,
-                Token::Multiply => BinaryOperator::Multiply,
-                Token::Divide => BinaryOperator::Divide,
+                Token::Plus => Verb::Add,
+                Token::Minus => Verb::Subtract,
+                Token::Multiply => Verb::Multiply,
+                Token::Divide => Verb::Divide,
                 _ => unreachable!(),
             });
             // The AST is still a right-nested tree, which evaluate and drop recurse over.

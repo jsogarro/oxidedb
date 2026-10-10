@@ -135,11 +135,11 @@ fn display_col_empty() {
 }
 
 #[test]
-fn display_col_float_nan_equality_is_derived() {
-    // Documents the derived PartialEq: a float column holding 0n is not equal to itself.
-    // To be decided with the Value type.
+fn display_col_float_null_equals_itself() {
+    // Nulls compare equal: a float column holding 0n equals itself.
     let c = Column::Float(vec![1.0, f64::NAN]);
-    assert_ne!(c, c.clone());
+    assert_eq!(c, c.clone());
+    assert_ne!(c, Column::Float(vec![1.0, 2.0]));
 }
 
 #[test]

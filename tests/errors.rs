@@ -1,7 +1,7 @@
 use oxidedb::language::lexer::Token;
 use oxidedb::{Interpreter, Lexer, Parser, QError};
 
-fn run(src: &str) -> Result<Option<oxidedb::Atom>, QError> {
+fn run(src: &str) -> Result<Option<oxidedb::Value>, QError> {
     Interpreter::new().eval_line(src)
 }
 

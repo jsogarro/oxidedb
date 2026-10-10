@@ -80,7 +80,9 @@ fn atoms_non_null_edge_values() {
 }
 
 #[test]
-fn atoms_float_null_derived_eq_is_unequal() {
-    // Documents derived PartialEq: NaN != NaN. `0n=0n` must be handled in the comparison kernel.
-    assert_ne!(Atom::Float(f64::NAN), Atom::Float(f64::NAN));
+fn atoms_float_null_equals_null() {
+    // Nulls compare equal (decided with the Value type); 0f and -0f stay equal.
+    assert_eq!(Atom::Float(f64::NAN), Atom::Float(f64::NAN));
+    assert_ne!(Atom::Float(f64::NAN), Atom::Float(1.0));
+    assert_eq!(Atom::Float(0.0), Atom::Float(-0.0));
 }

@@ -3,7 +3,7 @@ use super::sym::Sym;
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use std::fmt;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum Atom {
     // Basic numeric types
     Boolean(bool),
@@ -24,6 +24,30 @@ pub enum Atom {
     NullDate,
     NullTime,
     NullTimestamp,
+}
+
+/// Float equality where null equals null: `NaN == NaN`, while `0f == -0f`.
+pub(crate) fn float_eq(a: f64, b: f64) -> bool {
+    a == b || (a.is_nan() && b.is_nan())
+}
+
+/// Nulls compare equal (`0n` equals `0n`), unlike derived IEEE equality.
+impl PartialEq for Atom {
+    fn eq(&self, other: &Atom) -> bool {
+        use Atom::*;
+        match (self, other) {
+            (Boolean(a), Boolean(b)) => a == b,
+            (Integer(a), Integer(b)) => a == b,
+            (Float(a), Float(b)) => float_eq(*a, *b),
+            (Character(a), Character(b)) => a == b,
+            (Date(a), Date(b)) => a == b,
+            (Time(a), Time(b)) => a == b,
+            (Timestamp(a), Timestamp(b)) => a == b,
+            (Symbol(a), Symbol(b)) => a == b,
+            (NullDate, NullDate) | (NullTime, NullTime) | (NullTimestamp, NullTimestamp) => true,
+            _ => false,
+        }
+    }
 }
 
 impl Atom {

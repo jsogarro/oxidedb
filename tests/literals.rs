@@ -6,7 +6,10 @@ fn eval(src: &str) -> anyhow::Result<oxidedb::Atom> {
     for stmt in src.split(';') {
         last = interp.eval_line(stmt)?;
     }
-    Ok(last.unwrap())
+    match last.unwrap() {
+        oxidedb::Value::Atom(a) => Ok(a),
+        v => anyhow::bail!("not an atom: {v}"),
+    }
 }
 
 fn show(src: &str) -> String {

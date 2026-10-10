@@ -1,11 +1,11 @@
 use oxidedb::language::lexer::Token;
-use oxidedb::{Atom, Interpreter, Lexer, Parser};
+use oxidedb::{Atom, Interpreter, Lexer, Parser, Value};
 
 fn lex(src: &str) -> Vec<Token> {
     Lexer::new(src).tokenize().unwrap()
 }
 
-fn eval(src: &str) -> Atom {
+fn eval(src: &str) -> Value {
     let ast = Parser::new(lex(src)).parse().unwrap();
     Interpreter::new().evaluate(ast).unwrap()
 }

@@ -30,7 +30,13 @@ OxideDB is currently a small q-inspired expression interpreter (the **O** langua
 
 ## Values
 
-Every result is an `Atom`. Symbol, date, time and timestamp atoms exist as types, but the language has no literal for them yet. Long, float, character and symbol nulls are sentinels, not separate variants: `Integer(i64::MIN)`, `Float(NaN)`, `Character(' ')`, `Symbol(Sym::NULL)`. Producing `i64::MIN` by arithmetic is reported as overflow. Only the temporal nulls have their own variants. Variables live in the interpreter's map for the length of the session and are not saved.
+Evaluation returns a `Value` (`src/types/value.rs`): an `Atom`, a `Vector(Rc<Column>)` (typed, one element type) or a `List(Rc<Vec<Value>>)` (general list, type code 0). Atoms have negative type codes, vectors positive, general lists 0. `Value::from_items` is the one constructor for lists: items that are all atoms of one column type become a `Vector` (no int to float promotion); empty input or anything else is a `List`. Variables hold `Value`s, so reading a vector variable is a reference-count bump. `Interpreter::set` and `get` bind and read variables from the library API.
+
+Equality treats nulls as equal (`0n` equals `0n`, in atoms, columns and lists), while `0f` and `-0f` stay equal. `Value` also compares with `Atom` in both directions, so an atom result can be asserted directly. A general list prints one item per line, `()` when empty.
+
+Arithmetic is atom-only: an operand that is a vector or list gives `'nyi: vector arithmetic`. The parser produces the `Verb`s `+ - * %`; `= < > <> <= >= # , !` exist in the AST and give `'nyi: <verb>` until implemented.
+
+Symbol, date, time and timestamp atoms exist as types, but the language has no literal for them yet. Long, float, character and symbol nulls are sentinels, not separate variants: `Integer(i64::MIN)`, `Float(NaN)`, `Character(' ')`, `Symbol(Sym::NULL)`. Producing `i64::MIN` by arithmetic is reported as overflow. Only the temporal nulls have their own variants. Variables live in the interpreter's map for the length of the session and are not saved.
 
 ## Error handling
 
@@ -49,7 +55,7 @@ There are no `#[cfg(test)]` modules in `src/`.
 
 Not implemented; nothing here is partially present.
 
-- Vectors and lists in the language (indexing, vector arithmetic).
+- Vector and list literals, indexing and vector arithmetic (the `Value` type exists; the language cannot yet build one).
 - Dictionaries and tables, and queries over them.
 - Functions, conditionals and adverbs.
 - Persistence of variables and tables.

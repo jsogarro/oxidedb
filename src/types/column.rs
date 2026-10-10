@@ -1,14 +1,30 @@
-use super::atom::Atom;
+use super::atom::{float_eq, Atom};
 use super::sym::Sym;
 
 /// A typed vector. Mixed data is never a `Column`.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum Column {
     Bool(Vec<bool>),
     Long(Vec<i64>),
     Float(Vec<f64>),
     Char(Vec<char>),
     Sym(Vec<Sym>),
+}
+
+/// Element-wise equality; a float `0n` equals `0n`.
+impl PartialEq for Column {
+    fn eq(&self, other: &Column) -> bool {
+        match (self, other) {
+            (Column::Bool(a), Column::Bool(b)) => a == b,
+            (Column::Long(a), Column::Long(b)) => a == b,
+            (Column::Float(a), Column::Float(b)) => {
+                a.len() == b.len() && a.iter().zip(b).all(|(x, y)| float_eq(*x, *y))
+            }
+            (Column::Char(a), Column::Char(b)) => a == b,
+            (Column::Sym(a), Column::Sym(b)) => a == b,
+            _ => false,
+        }
+    }
 }
 
 impl Column {
