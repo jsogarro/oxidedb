@@ -1,5 +1,5 @@
 //! Verb and punctuation tokens (lexer only; the parser reports each as not
-//! yet implemented).
+//! yet implemented; the dyadic verbs parse since `tests/dyadic_verbs.rs`).
 use oxidedb::language::lexer::Token;
 use oxidedb::{Interpreter, Lexer, QError};
 
@@ -16,6 +16,8 @@ fn eval_err(src: &str) -> QError {
 fn unexpected(ch: &str) -> QError {
     QError::Parse(format!("unexpected character: {ch}"))
 }
+
+const DYADIC: &[&str] = &["=", "<", ">", "<>", "<=", ">=", "#", ",", "!"];
 
 const SINGLES: &[(&str, Token)] = &[
     ("=", Token::Equal),
@@ -142,7 +144,8 @@ fn lex_verbs_unknown_characters_still_rejected() {
 
 #[test]
 fn lex_verbs_parser_rejects_as_nyi() {
-    for (src, _) in SINGLES {
+    // The dyadic verbs now parse (tests/dyadic_verbs.rs); only the rest are still nyi here.
+    for (src, _) in SINGLES.iter().filter(|(s, _)| !DYADIC.contains(s)) {
         // after whitespace (or at line start) a `/` starts a comment, so glue it to a `1`
         for expr in [format!("1{src}"), format!("1{src}2"), format!("(1{src}")] {
             let err = eval_err(&expr);
@@ -164,7 +167,8 @@ fn lex_verbs_parser_rejects_as_nyi() {
         assert_eq!(eval_err(src), QError::Nyi(want.into()), "{src}");
     }
     assert_eq!(eval_err("=").to_string(), "'nyi: =");
-    assert_eq!(eval_err("1<>2").to_string(), "'nyi: <>");
+    assert_eq!(eval_err("<>").to_string(), "'nyi: <>");
+    assert_eq!(eval_err("1$2").to_string(), "'nyi: $");
 }
 
 #[test]
@@ -264,9 +268,8 @@ fn lex_verbs_negative_literal_after_noun_endings() {
 #[test]
 fn lex_verbs_nyi_inside_parentheses() {
     for (src, detail) in [
-        ("(1=2)", "="),
-        ("x:(1<2)", "<"),
-        ("(1,2)", ","),
+        ("(1$2)", "$"),
+        ("x:(1@2)", "@"),
         ("(1/2)", "adverb '/'"),
         ("(1\\2)", "adverb '\\'"),
         ("(1'2)", "adverb ' (each)"),
