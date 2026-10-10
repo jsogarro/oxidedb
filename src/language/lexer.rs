@@ -16,6 +16,10 @@ pub enum Token {
     Multiply,
     Divide,
 
+    // Adverbs (lexed; not yet parsed)
+    Over,
+    Scan,
+
     // Punctuation
     LeftParen,
     RightParen,
@@ -43,6 +47,8 @@ impl fmt::Display for Token {
             Token::Minus => write!(f, "-"),
             Token::Multiply => write!(f, "*"),
             Token::Divide => write!(f, "%"),
+            Token::Over => write!(f, "/"),
+            Token::Scan => write!(f, "\\"),
             Token::LeftParen => write!(f, "("),
             Token::RightParen => write!(f, ")"),
             Token::LeftBracket => write!(f, "["),
@@ -112,6 +118,17 @@ impl Lexer {
                     self.advance();
                     Ok(Token::Divide)
                 }
+                // A comment `/` was already consumed by skip_whitespace, so any
+                // `/` reaching here is glued to the previous token.
+                '/' => {
+                    self.advance();
+                    Ok(Token::Over)
+                }
+                '\\' => {
+                    self.advance();
+                    Ok(Token::Scan)
+                }
+                '.' if self.next_is_digit() => self.read_number(),
                 '(' => {
                     self.advance();
                     Ok(Token::LeftParen)
@@ -149,24 +166,40 @@ impl Lexer {
         self.current_char = self.input.get(self.position).copied();
     }
 
+    /// Skips whitespace and `/` comments. q rule: `/` at line start or after
+    /// whitespace comments out the rest of the line; a glued `/` is the over adverb.
     fn skip_whitespace(&mut self) {
         while let Some(ch) = self.current_char {
             if ch.is_whitespace() {
                 self.advance();
+            } else if ch == '/'
+                && (self.position == 0 || self.input[self.position - 1].is_whitespace())
+            {
+                while self.current_char.is_some_and(|c| c != '\n') {
+                    self.advance();
+                }
             } else {
                 break;
             }
         }
     }
 
+    fn next_is_digit(&self) -> bool {
+        self.input
+            .get(self.position + 1)
+            .is_some_and(char::is_ascii_digit)
+    }
+
     /// q rule: `-` glued to a digit is part of the number at input start or
     /// after a non-noun; after a noun only when preceded by whitespace (`2 -1`).
     fn starts_negative_literal(&self, prev: Option<&Token>) -> bool {
-        if !self
-            .input
-            .get(self.position + 1)
-            .is_some_and(char::is_ascii_digit)
-        {
+        let next = self.input.get(self.position + 1);
+        let dot_digit = next == Some(&'.')
+            && self
+                .input
+                .get(self.position + 2)
+                .is_some_and(char::is_ascii_digit);
+        if !(next.is_some_and(char::is_ascii_digit) || dot_digit) {
             return false;
         }
         let spaced = self.position > 0 && self.input[self.position - 1].is_whitespace();

@@ -5,19 +5,39 @@ use crate::language::{
 use crate::types::atom::Atom;
 use anyhow::{anyhow, Result};
 
+fn adverb_nyi(token: &Token) -> anyhow::Error {
+    anyhow!("adverb '{}' not yet implemented", token)
+}
+
 pub struct Parser {
     tokens: Vec<Token>,
     current: usize,
+    depth: usize,
 }
 
+/// Maximum nesting of parentheses / monadic minus.
+const MAX_DEPTH: usize = 128;
+/// Maximum operators in one flat chain (`1+1+...`); evaluate and drop recurse over it.
+const MAX_CHAIN: usize = 2_000;
+
 impl Parser {
-    pub fn new(tokens: Vec<Token>) -> Self {
-        Self { tokens, current: 0 }
+    pub fn new(mut tokens: Vec<Token>) -> Self {
+        if !matches!(tokens.last(), Some(Token::Eof)) {
+            tokens.push(Token::Eof);
+        }
+        Self {
+            tokens,
+            current: 0,
+            depth: 0,
+        }
     }
 
     pub fn parse(&mut self) -> Result<Expr> {
         let expr = self.expression()?;
         if !self.is_at_end() {
+            if matches!(self.peek(), Token::Over | Token::Scan) {
+                return Err(adverb_nyi(self.peek()));
+            }
             return Err(anyhow!(
                 "Unexpected token after expression: {:?}",
                 self.peek()
@@ -27,7 +47,13 @@ impl Parser {
     }
 
     fn expression(&mut self) -> Result<Expr> {
-        self.assignment()
+        if self.depth >= MAX_DEPTH {
+            return Err(anyhow!("expression nested too deeply"));
+        }
+        self.depth += 1;
+        let result = self.assignment();
+        self.depth -= 1;
+        result
     }
 
     fn assignment(&mut self) -> Result<Expr> {
@@ -48,31 +74,55 @@ impl Parser {
     }
 
     fn binary_expression(&mut self) -> Result<Expr> {
-        let left = self.unary()?;
-
-        if self.match_tokens(&[Token::Plus, Token::Minus, Token::Multiply, Token::Divide]) {
-            let operator = match self.previous() {
+        // Parsed iteratively so a long flat chain does not consume parser depth;
+        // folded from the right into the same right-associative AST.
+        let mut operands = Vec::new();
+        let mut operators = Vec::new();
+        loop {
+            let mut operand = self.unary()?;
+            // An assignment in operand position (`x+y:2`) takes the rest of the input.
+            if let (false, Expr::Symbol(name)) = (operands.is_empty(), &operand) {
+                if self.match_tokens(&[Token::Colon]) {
+                    let name = name.clone();
+                    let value = self.expression()?;
+                    operand = Expr::Assignment {
+                        name,
+                        value: Box::new(value),
+                    };
+                }
+            }
+            operands.push(operand);
+            if !self.match_tokens(&[Token::Plus, Token::Minus, Token::Multiply, Token::Divide]) {
+                break;
+            }
+            operators.push(match self.previous() {
                 Token::Plus => BinaryOperator::Add,
                 Token::Minus => BinaryOperator::Subtract,
                 Token::Multiply => BinaryOperator::Multiply,
                 Token::Divide => BinaryOperator::Divide,
                 _ => unreachable!(),
-            };
-            // Right-associative: recursively parse the right side
-            let right = self.expression()?;
-            Ok(Expr::BinaryOp {
+            });
+            // The AST is still a right-nested tree, which evaluate and drop recurse over.
+            if operators.len() >= MAX_CHAIN {
+                return Err(anyhow!("expression too long"));
+            }
+        }
+        let mut right = operands.pop().expect("at least one operand");
+        while let Some(operator) = operators.pop() {
+            let left = operands.pop().expect("operand per operator");
+            right = Expr::BinaryOp {
                 left: Box::new(left),
                 operator,
                 right: Box::new(right),
-            })
-        } else {
-            Ok(left)
+            };
         }
+        Ok(right)
     }
 
     fn unary(&mut self) -> Result<Expr> {
         if self.match_tokens(&[Token::Minus]) {
-            let expr = self.unary()?;
+            // Monadic minus takes its whole right side, as in q: -x+3 is -(x+3).
+            let expr = self.expression()?;
             return Ok(Expr::UnaryOp {
                 operator: UnaryOperator::Negate,
                 operand: Box::new(expr),
@@ -99,6 +149,7 @@ impl Parser {
                 }
                 Ok(expr)
             }
+            token @ (Token::Over | Token::Scan) => Err(adverb_nyi(token)),
             token => Err(anyhow!("Unexpected token: {:?}", token)),
         }
     }

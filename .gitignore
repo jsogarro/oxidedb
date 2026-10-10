@@ -21,3 +21,6 @@ tarpaulin-report.html
 cobertura.xml
 
 **.prompt.md
+# proptest failure seeds: a red never-panics run is a bug to fix, not a seed to keep
+proptest-regressions/
+*.proptest-regressions

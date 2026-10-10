@@ -33,7 +33,7 @@ cargo run
 ```
 
 You'll see:
-```
+```text
 OxideDB - A Q-inspired columnar database
 Type 'exit', 'quit', or '\\' to exit
 
@@ -50,7 +50,7 @@ oxidedb> 2 + 3
 
 - **Code blocks** show O expressions you can type in the REPL
 - **Results** are shown immediately after the expression
-- **Comments** start with `//` and explain what's happening. Today a comment must be on a line of its own, in a `.o` file; the REPL does not accept them, and a comment after an expression is an error
+- **Comments** start with `/` at the beginning of a line or after a space (`//` works too) and run to the end of the line; they explain what's happening
 - **Exercises** appear at the end of each chapter
 
 ## Key Concepts

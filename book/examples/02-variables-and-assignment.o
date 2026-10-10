@@ -133,7 +133,8 @@ wrong_temp
 // Expected output: 1.8
 ratio:9%5
 
-// Expected output: 845f (right-to-left: 25 * (1.8 + 32) = 25 * 33.8 = 845)
+// right-to-left: 25 * (1.8 + 32) = 25 * 33.8 = 845
+// Expected output: 845f
 fahrenheit:celsius*ratio+32
 
 // Expected output: 845f
@@ -146,8 +147,15 @@ celsius_float:20.0
 // Expected output: 1.8
 ratio_float:9.0%5.0
 
-// Expected output: 676f (right-to-left: 20.0 * (1.8 + 32) = 20.0 * 33.8 = 676)
+// right-to-left: 20.0 * (1.8 + 32) = 20.0 * 33.8 = 676
+// Expected output: 676f
 fahrenheit_float:celsius_float*ratio_float+32
 
 // Expected output: 676f
 fahrenheit_float
+// A minus applied to a variable negates everything to its right: -x+3 is -(x+3)
+// Expected output: 2
+neg_x:2
+
+// Expected output: -5
+-neg_x+3

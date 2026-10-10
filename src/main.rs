@@ -9,10 +9,15 @@ fn main() -> Result<()> {
     if args.len() > 1 {
         // File execution mode
         let filename = &args[1];
-        println!("{} {}", "OxideDB - Executing".green().bold(), filename);
+        // Banner goes to stderr so stdout carries only results.
+        eprintln!("{} {}", "OxideDB - Executing".green().bold(), filename);
 
         let mut repl = Repl::new();
-        repl.run_file(filename)
+        if let Err(e) = repl.run_file(filename) {
+            eprintln!("{}: {}", "Error".red(), e);
+            std::process::exit(1);
+        }
+        Ok(())
     } else {
         // Interactive REPL mode
         println!(

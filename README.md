@@ -11,7 +11,7 @@ OxideDB aims to provide the power and expressiveness of Q/KDB+ with Rust's memor
 - **O Programming Language**: Q-inspired array programming language with right-to-left evaluation
 - **Interactive REPL**: Full-featured Read-Eval-Print Loop with command history
 - **File Execution**: Run O scripts directly from files (.o extension)
-- **Variable System**: Named values held in memory for the length of a session (nothing is saved to disk)
+- **Variable System**: Named values held in memory for the length of a session (nothing is saved to disk; REPL input history is kept in `~/.oxidedb_history`)
 - **Type System**: Integers, floats, booleans and characters (symbol literals are not implemented yet)
 - **Comprehensive Documentation**: "O for Humans" book with executable examples
 - **Memory Safety**: Written in safe Rust
@@ -20,7 +20,7 @@ OxideDB aims to provide the power and expressiveness of Q/KDB+ with Rust's memor
 
 ### Prerequisites
 
-- Rust 1.70 or later
+- Rust 1.78 or later (`Cargo.lock` is version 4)
 - Cargo
 
 ### Building
@@ -75,7 +75,7 @@ Phase 1 of the O language implementation is **complete** with a fully functional
 - ✅ **Atom Types**: Integers, floats, booleans and characters with q-style type codes
 - ✅ **Interactive REPL**: Full-featured environment with command history and error handling
 - ✅ **File Execution**: Run .o script files with line-by-line execution and error reporting
-- ✅ **Testing**: unit, integration and property tests, plus tests that run every example in the book
+- ✅ **Testing**: integration and property tests, plus tests that run every example in the book
 - ✅ **Benchmarks**: Criterion benchmarks for basic operations (`cargo bench`)
 - ✅ **Documentation**: "O for Humans" book with executable examples
 
@@ -129,23 +129,21 @@ oxidedb> y:x*2        // Using variables
 20
 oxidedb> y
 20
-oxidedb> 2.5 + 1.5    // Mixed arithmetic
+oxidedb> 2.5 + 1.5    // Float arithmetic
 4f
-oxidedb> \\           // Q-style exit
+oxidedb> \\
 Goodbye!
 ```
 
 ### File Execution
 ```bash
 $ cargo run -- book/examples/01-atoms-and-arithmetic.o
-OxideDB - Executing book/examples/01-atoms-and-arithmetic.o
 42
 -17
+0
 3.14159
-1b
-"a"
-5
-# ... more output
+-2.5
+...
 ```
 
 ## Learning O
