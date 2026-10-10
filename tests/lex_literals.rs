@@ -1,5 +1,5 @@
 use oxidedb::language::lexer::Token;
-use oxidedb::{Atom, Interpreter, Lexer, Parser};
+use oxidedb::{Atom, Interpreter, Lexer, Parser, Value};
 
 fn lex(src: &str) -> Vec<Token> {
     let mut tokens = Lexer::new(src).tokenize().unwrap();
@@ -7,7 +7,7 @@ fn lex(src: &str) -> Vec<Token> {
     tokens
 }
 
-fn eval(interp: &mut Interpreter, src: &str) -> Atom {
+fn eval(interp: &mut Interpreter, src: &str) -> Value {
     let tokens = Lexer::new(src).tokenize().unwrap();
     let ast = Parser::new(tokens).parse().unwrap();
     interp.evaluate(ast).unwrap()

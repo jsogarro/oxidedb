@@ -100,6 +100,6 @@ impl Repl {
 
     /// Evaluates one line; `None` for input with no tokens (e.g. a comment).
     pub fn eval_line(&mut self, input: &str) -> QResult<Option<String>> {
-        Ok(self.interpreter.eval_line(input)?.map(|a| a.to_string()))
+        Ok(self.interpreter.eval_line(input)?.map(|v| v.to_string()))
     }
 }
