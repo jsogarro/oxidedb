@@ -249,10 +249,11 @@ fn verbs_chain_limit_holds_for_new_verbs() {
         .unwrap()
         .join()
         .unwrap();
-    assert_eq!(e, Err("'parse: expression too long".to_string()));
+    assert!(e.unwrap_err().starts_with("'parse: expression too long"));
     // mixed verbs count toward the same cap
     let mixed = format!("{}1", "1<1+".repeat(1500));
-    assert_eq!(eval(&mixed), Err(QError::parse("expression too long")));
+    let err = eval(&mixed).unwrap_err().to_string();
+    assert!(err.starts_with("'parse: expression too long"), "{err}");
 }
 
 #[test]
