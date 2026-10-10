@@ -169,7 +169,6 @@ The codebase is organized into several modules:
 
 - `language/`: Lexer, parser, AST, and interpreter for O language
 - `types/`: Core data types (atoms, vectors, dictionaries, tables)
-- `engine/`: Memory management, storage, and query execution
 - `repl/`: Interactive REPL interface with file execution support
 - `book/`: Complete "O for Humans" documentation and examples
 

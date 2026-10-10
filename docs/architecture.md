@@ -20,11 +20,9 @@ OxideDB is designed as a modular system with clear separation of concerns betwee
 - **Dictionary** (`dictionary.rs`): Key-value mappings
 - **Table** (`table.rs`): Columnar data structures
 
-### Engine Module (`src/engine/`)
+### Planned
 
-- **Memory** (`memory.rs`): Memory management and reference counting
-- **Storage** (`storage.rs`): Persistence and file I/O
-- **Query** (`query.rs`): Query planning and execution
+Persistent storage, a query planner, and memory management are not implemented yet.
 
 ### REPL Module (`src/repl/`)
 
