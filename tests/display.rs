@@ -53,3 +53,74 @@ fn display_float_g_format_thresholds() {
     assert_eq!(show(1e20), "1e+20");
     assert_eq!(show(-0.0), "-0f");
 }
+
+use oxidedb::types::column::Column;
+use oxidedb::types::sym::Sym;
+
+fn col(c: Column) -> String {
+    format!("{}", c)
+}
+
+#[test]
+fn display_col_long() {
+    assert_eq!(col(Column::Long(vec![1, 2, 3])), "1 2 3");
+    assert_eq!(col(Column::Long(vec![5])), ",5");
+    assert_eq!(col(Column::Long(vec![1, i64::MIN, 3])), "1 0N 3");
+    assert_eq!(col(Column::Long(vec![i64::MIN])), ",0N");
+    assert_eq!(col(Column::Long(vec![-1, -20])), "-1 -20");
+}
+
+#[test]
+fn display_col_float() {
+    assert_eq!(col(Column::Float(vec![1.0, 2.5, 3.0])), "1 2.5 3");
+    assert_eq!(col(Column::Float(vec![1.0, 2.0, 3.0])), "1 2 3f");
+    assert_eq!(col(Column::Float(vec![20.0])), ",20f");
+    assert_eq!(col(Column::Float(vec![2.5])), ",2.5");
+    assert_eq!(col(Column::Float(vec![1.0, f64::NAN, 3.0])), "1 0n 3f");
+    assert_eq!(col(Column::Float(vec![1.0, f64::INFINITY])), "1 0wf");
+}
+
+#[test]
+fn display_col_float_specials() {
+    assert_eq!(col(Column::Float(vec![f64::NAN, 1.5])), "0n 1.5");
+    assert_eq!(col(Column::Float(vec![f64::NEG_INFINITY, 1.5])), "-0w 1.5");
+    assert_eq!(col(Column::Float(vec![f64::NAN, f64::NAN])), "0n 0n");
+    assert_eq!(col(Column::Float(vec![1e20, 1.0])), "1e+20 1");
+    assert_eq!(col(Column::Float(vec![0.1 + 0.2, 1.0])), "0.3 1");
+}
+
+#[test]
+fn display_col_bool() {
+    assert_eq!(col(Column::Bool(vec![true, false, true])), "101b");
+    assert_eq!(col(Column::Bool(vec![true])), ",1b");
+    assert_eq!(col(Column::Bool(vec![false])), ",0b");
+}
+
+#[test]
+fn display_col_sym() {
+    let s = |x: &str| Sym::intern(x);
+    assert_eq!(col(Column::Sym(vec![s("a"), s("b")])), "`a`b");
+    assert_eq!(col(Column::Sym(vec![s("a")])), ",`a");
+    assert_eq!(col(Column::Sym(vec![s("a"), Sym::NULL, s("b")])), "`a``b");
+}
+
+#[test]
+fn display_col_char() {
+    assert_eq!(col(Column::Char(vec!['a', 'b', 'c'])), "\"abc\"");
+    assert_eq!(col(Column::Char(vec!['a'])), ",\"a\"");
+    assert_eq!(col(Column::Char(vec![])), "\"\"");
+    assert_eq!(col(Column::Char(vec!['"'])), ",\"\\\"\"");
+    assert_eq!(col(Column::Char(vec!['\\', 'a'])), "\"\\\\a\"");
+    assert_eq!(
+        col(Column::Char(vec!['a', '\n', '\t', '\r'])),
+        "\"a\\n\\t\\r\""
+    );
+}
+
+#[test]
+fn display_col_empty() {
+    assert_eq!(col(Column::Long(vec![])), "`long$()");
+    assert_eq!(col(Column::Float(vec![])), "`float$()");
+    assert_eq!(col(Column::Bool(vec![])), "`boolean$()");
+    assert_eq!(col(Column::Sym(vec![])), "`symbol$()");
+}
