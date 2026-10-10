@@ -120,23 +120,23 @@ total
 celsius:25
 
 // Due to right-to-left evaluation, we need parentheses for proper temperature conversion
-// celsius*9%5+32 would be evaluated as celsius*(9%(5+32)) = 25*(9%37) = 25*0 = 0
+// celsius*9%5+32 would be evaluated as celsius*(9%(5+32)) = 25*(9%37) = 25*0.2432432 = 6.081081
 // Let's demonstrate this first:
-// Expected output: 0
+// Expected output: 6.081081
 wrong_temp:celsius*9%5+32
 
-// Expected output: 0
+// Expected output: 6.081081
 wrong_temp
 
 // For proper temperature conversion, we need to use parentheses or separate steps
 // Step-by-step conversion:
-// Expected output: 1
+// Expected output: 1.8
 ratio:9%5
 
-// Expected output: 825 (right-to-left: 25 * (1 + 32) = 25 * 33 = 825)
+// Expected output: 845f (right-to-left: 25 * (1.8 + 32) = 25 * 33.8 = 845)
 fahrenheit:celsius*ratio+32
 
-// Expected output: 825
+// Expected output: 845f
 fahrenheit
 
 // Better temperature conversion with floats for accurate ratio
