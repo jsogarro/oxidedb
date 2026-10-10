@@ -61,6 +61,7 @@ fn comment_whole_line() {
     assert_eq!(lex("// hi"), vec![Token::Eof]);
     assert_eq!(lex("/"), vec![Token::Eof]);
     assert_eq!(lex("  / hi"), vec![Token::Eof]);
+    assert_eq!(lex("1\t/ c"), vec![Token::Integer(1), Token::Eof]);
 }
 
 #[test]
@@ -119,7 +120,10 @@ fn run_file_skips_comment_only_lines() {
 fn repl_backslash_exit_still_works() {
     use std::io::Write;
     use std::process::{Command, Stdio};
+    let home = std::env::temp_dir().join(format!("oxidedb-home-{}", std::process::id()));
+    std::fs::create_dir_all(&home).unwrap();
     let mut child = Command::new(env!("CARGO_BIN_EXE_oxidedb"))
+        .env("HOME", &home)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
@@ -131,6 +135,7 @@ fn repl_backslash_exit_still_works() {
         .write_all(b"/ hi\n1 + 2 // n\n\\\\\n")
         .unwrap();
     let out = child.wait_with_output().unwrap();
+    std::fs::remove_dir_all(&home).ok();
     let text = String::from_utf8_lossy(&out.stdout);
     assert!(text.contains("Goodbye!"), "{text}");
     assert!(!text.contains("Error"), "{text}");
