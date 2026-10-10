@@ -253,7 +253,7 @@ fn arith_symbol_is_type_error() {
     let date = Value::Atom(Atom::NullDate);
     for verb in ARITH {
         let e = Err(QError::Type);
-        for bad in [&sym, &chr, &date, &sv(&["a"]), &cv("a"), &sv(&[]), &cv("")] {
+        for bad in [&sym, &chr, &date, &sv(&["a"]), &cv("a")] {
             assert_eq!(dyad(verb, bad, &l(1)), e, "{verb:?} {bad:?}");
             assert_eq!(dyad(verb, &l(1), bad), e, "{verb:?} {bad:?}");
             assert_eq!(dyad(verb, &f(1.0), bad), e, "{verb:?} {bad:?}");
@@ -261,6 +261,18 @@ fn arith_symbol_is_type_error() {
             assert_eq!(dyad(verb, bad, &fv(&[1.0])), e, "{verb:?} {bad:?}");
             assert_eq!(dyad(verb, bad, &b(true)), e, "{verb:?} {bad:?}");
             assert_eq!(dyad(verb, &bv(&[true]), bad), e, "{verb:?} {bad:?}");
+        }
+        // empty vectors: a type error against an atom, a length error against
+        // a one-item vector (lengths are checked first, as in q)
+        for empty in [&sv(&[]), &cv("")] {
+            assert_eq!(dyad(verb, empty, &l(1)), e, "{verb:?}");
+            assert_eq!(dyad(verb, &l(1), empty), e, "{verb:?}");
+            assert_eq!(dyad(verb, empty, &lv(&[])), e, "{verb:?}");
+            assert_eq!(
+                dyad(verb, &lv(&[1]), empty),
+                Err(QError::Length),
+                "{verb:?}"
+            );
         }
         assert_eq!(dyad(verb, &sym, &sym), e);
         assert_eq!(dyad(verb, &chr, &chr), e);
@@ -467,12 +479,11 @@ fn arith_negate() {
 
 #[test]
 fn arith_other_verbs_stay_nyi() {
-    for verb in [Verb::Take, Verb::Join, Verb::Key] {
-        let e = Err(QError::Nyi(verb.symbol().into()));
-        assert_eq!(dyad(verb, &l(1), &l(2)), e);
-        assert_eq!(dyad(verb, &lv(&[1]), &l(2)), e);
-        assert_eq!(dyad(verb, &l(1), &list(vec![])), e);
-    }
+    let verb = Verb::Key;
+    let e = Err(QError::Nyi(verb.symbol().into()));
+    assert_eq!(dyad(verb, &l(1), &l(2)), e);
+    assert_eq!(dyad(verb, &lv(&[1]), &l(2)), e);
+    assert_eq!(dyad(verb, &l(1), &list(vec![])), e);
 }
 
 // The language cannot write vector literals yet, so bind them from the host.
@@ -606,5 +617,33 @@ proptest! {
     ) {
         prop_assume!(n != m);
         prop_assert_eq!(dyad(verb, &lv(&vec![1; n]), &lv(&vec![1; m])), Err(QError::Length));
+    }
+}
+
+// #86: q checks lengths before element types (`1 2 3+`a`b` is 'length).
+#[test]
+fn arith_length_is_checked_before_type() {
+    let sym_atom = Value::Atom(Atom::Symbol(Sym::intern("a")));
+    for verb in ARITH {
+        assert_eq!(
+            dyad(verb, &lv(&[1, 2, 3]), &sv(&["a", "b"])),
+            Err(QError::Length)
+        );
+        assert_eq!(dyad(verb, &lv(&[1, 2, 3]), &cv("")), Err(QError::Length));
+        assert_eq!(
+            dyad(verb, &sv(&["a", "b"]), &fv(&[1.0, 2.0, 3.0])),
+            Err(QError::Length)
+        );
+        assert_eq!(
+            dyad(verb, &cv("ab"), &sv(&["a", "b", "c"])),
+            Err(QError::Length)
+        );
+        // equal lengths still report the type
+        assert_eq!(
+            dyad(verb, &lv(&[1, 2]), &sv(&["a", "b"])),
+            Err(QError::Type)
+        );
+        // an atom side has no length to mismatch
+        assert_eq!(dyad(verb, &lv(&[1, 2, 3]), &sym_atom), Err(QError::Type));
     }
 }
