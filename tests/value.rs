@@ -163,13 +163,20 @@ fn value_null_equality() {
 }
 
 #[test]
-fn value_non_atom_arithmetic_is_nyi() {
-    let nyi = || QError::Nyi("vector arithmetic".into());
+fn value_non_atom_arithmetic_evaluates() {
     let mut i = Interpreter::new();
     i.set("v", longs(&[1, 2, 3]));
     i.set("l", Value::List(Rc::new(vec![int(1)])));
-    for src in ["v+1", "1+v", "v*v", "l-1", "1%l", "-v", "-l"] {
-        assert_eq!(i.eval_line(src), Err(nyi()), "{src}");
+    for (src, want) in [
+        ("v+1", longs(&[2, 3, 4])),
+        ("1+v", longs(&[2, 3, 4])),
+        ("v*v", longs(&[1, 4, 9])),
+        ("l-1", longs(&[0])),
+        ("1%l", floats(&[1.0])),
+        ("-v", longs(&[-1, -2, -3])),
+        ("-l", longs(&[-1])),
+    ] {
+        assert_eq!(i.eval_line(src), Ok(Some(want)), "{src}");
     }
     // Bound values are still readable.
     assert_eq!(i.get("v"), Some(&longs(&[1, 2, 3])));
@@ -179,17 +186,7 @@ fn value_non_atom_arithmetic_is_nyi() {
 
 #[test]
 fn value_unimplemented_verbs_are_nyi() {
-    let verbs = [
-        (Verb::Equal, "="),
-        (Verb::Less, "<"),
-        (Verb::Greater, ">"),
-        (Verb::NotEqual, "<>"),
-        (Verb::LessEqual, "<="),
-        (Verb::GreaterEqual, ">="),
-        (Verb::Take, "#"),
-        (Verb::Join, ","),
-        (Verb::Key, "!"),
-    ];
+    let verbs = [(Verb::Take, "#"), (Verb::Join, ","), (Verb::Key, "!")];
     for (operator, sym) in verbs {
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Lit(Value::Atom(Atom::Integer(1)))),
@@ -379,10 +376,10 @@ fn value_new_verbs_on_any_operand_are_nyi_by_verb() {
     ] {
         let e = Expr::BinaryOp {
             left: Box::new(Expr::Lit(Value::Atom(l))),
-            operator: Verb::Equal,
+            operator: Verb::Join,
             right: Box::new(Expr::Lit(Value::Atom(r))),
         };
-        assert_eq!(i.evaluate(e), Err(QError::Nyi("=".into())));
+        assert_eq!(i.evaluate(e), Err(QError::Nyi(",".into())));
     }
     let e = Expr::BinaryOp {
         left: Box::new(Expr::Symbol("v".into())),

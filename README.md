@@ -75,6 +75,7 @@ Phase 1 of the O language implementation is **complete** with a fully functional
 - ✅ **Variable System**: Assignment (`x:5`) and retrieval, held in memory for the session
 - ✅ **Atom Types**: Integers, floats, booleans, characters and symbols with q-style type codes
 - ✅ **Vector Literals**: long, float, boolean, symbol and character vectors (strings)
+- ✅ **Vector Arithmetic**: `+ - * %` item by item, with broadcasting of atoms
 - ✅ **Interactive REPL**: Full-featured environment with command history and error handling
 - ✅ **File Execution**: Run .o script files with line-by-line execution and error reporting
 - ✅ **Testing**: integration and property tests, plus tests that run every example in the book
@@ -93,7 +94,8 @@ Phase 1 of the O language implementation is **complete** with a fully functional
 - ✅ Vector literals (`1 2 3`, `1 2.5 3`, `101b`, `` `a`b ``, `"abc"`) and symbol atoms
 - ⏳ Vector creation and manipulation (`til`, `count`, take, join)
 - ⏳ Indexing and slicing
-- ⏳ Basic vector operations (arithmetic, comparison)
+- ✅ Vector arithmetic (`+ - * %` on atoms and vectors)
+- ⏳ Comparison in the language (the kernel exists, the parser does not accept `=` `<` yet)
 - ⏳ Type-preserving operations
 
 #### Phase 3: Dictionaries and Tables (book Chapter 4)
@@ -136,6 +138,8 @@ oxidedb> 2.5 + 1.5    // Float arithmetic
 4f
 oxidedb> 1 2.5 3      // A vector literal; one float promotes all
 1 2.5 3
+oxidedb> 1 2 3 + 10   // Arithmetic applies to every item
+11 12 13
 oxidedb> \\
 Goodbye!
 ```
@@ -191,10 +195,12 @@ While O is inspired by Q, there are some important differences:
 
 - **Language Name**: O (instead of Q)
 - **File Extension**: `.o` files (instead of `.q`)
-- **Division Operator**: `%` (same as Q): always returns a float, and division by zero follows IEEE 754 (`1%0` is `0w`)
+- **Division Operator**: `%` (as in q): always returns a float, and division by zero follows IEEE 754 (`1%0` is `0w`)
 - **Deliberate deviations**: integer overflow is an error (q wraps around), and an out-of-range float literal such as `1e999` is an error. Nulls (`0N`, `0n`) propagate through arithmetic.
-- **Exit Commands**: `exit`, `quit`, or `\\` (Q standard)
-- **Right-to-Left Evaluation**: Fully implemented like Q
+- **Exit Commands**: `\\` is q's; `exit` and `quit` are O conveniences
+- **Right-to-Left Evaluation**: as in q
+- **Booleans in arithmetic**: `1b+1` is `2` in both; `1b+1b` is an int in q and a long in O
+- **Assignment echo**: q prints nothing for `x:5`; O shows the value
 
 ## References
 

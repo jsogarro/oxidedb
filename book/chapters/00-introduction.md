@@ -14,7 +14,7 @@ O combines the expressiveness of Q with modern language design principles:
 - **Right-to-Left Evaluation**: Natural mathematical evaluation order  
 - **Array-Oriented**: Designed for working with collections of data (Chapter 3 starts on vectors: a whole list of values in one go)
 - **Interactive**: Immediate feedback through the REPL
-- **Strict About Types**: Combinations that make no sense are errors, not silent conversions (for example, `1b + 1`)
+- **Strict About Types**: Combinations that make no sense are errors, not silent conversions (for example, `1 + "a"`)
 
 ## The OxideDB Environment
 
@@ -22,7 +22,7 @@ OxideDB provides an interactive environment where you can:
 - Execute O expressions immediately
 - Define variables and reuse their values
 
-Vector literals work (Chapter 3). Vector arithmetic, tables and queries are still to come.
+Vector literals and vector arithmetic work (Chapter 3). Tables and queries are still to come.
 
 ## Getting Started
 

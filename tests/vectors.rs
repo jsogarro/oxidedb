@@ -51,7 +51,6 @@ fn vec_lit_long() {
 fn vec_lit_float_promotes() {
     assert_eq!(eval("1 2.5 3"), Ok(floats(&[1.0, 2.5, 3.0])));
     assert_eq!(eval("1 2 3f"), Ok(floats(&[1.0, 2.0, 3.0])));
-    assert_eq!(eval("1f 2"), Ok(floats(&[1.0, 2.0])));
     assert_eq!(eval("1.5 2"), Ok(floats(&[1.5, 2.0])));
     assert_eq!(eval("1 2.5 3").unwrap().type_code(), 9);
     assert_eq!(show("1 2.5 3"), "1 2.5 3");
@@ -185,14 +184,40 @@ fn vec_lit_parens_and_comments() {
 }
 
 #[test]
-fn vec_lit_arithmetic_on_vectors_is_still_nyi() {
-    let nyi = Err(QError::Nyi("vector arithmetic".into()));
-    for src in ["1 2 3 + 1", "1 + 1 2 3", "- 1 2 3", "1 2 + 3 4", "(1 2)*2"] {
-        assert_eq!(eval(src), nyi, "{src}");
+fn vec_lit_arithmetic_evaluates() {
+    let l = |src: &str| eval(src);
+    assert_eq!(l("1 2 3+1"), Ok(longs(&[2, 3, 4])));
+    assert_eq!(l("1+1 2 3"), Ok(longs(&[2, 3, 4])));
+    assert_eq!(l("- 1 2 3"), Ok(longs(&[-1, -2, -3])));
+    assert_eq!(l("1 2+3 4"), Ok(longs(&[4, 6])));
+    assert_eq!(l("2*1 2"), Ok(longs(&[2, 4])));
+    assert_eq!(l("1 2 3 % 2"), Ok(floats(&[0.5, 1.0, 1.5])));
+    assert_eq!(l("1 2.5 + 1"), Ok(floats(&[2.0, 3.5])));
+    assert_eq!(l("1 0N 3 + 1"), Ok(longs(&[2, N, 4])));
+    assert_eq!(l("101b+1"), Ok(longs(&[2, 1, 2])));
+    assert_eq!(l("1 2 3+4 5"), Err(QError::Length));
+    assert_eq!(l("`a`b + 1"), Err(QError::Type));
+    assert_eq!(l("\"abc\" + 1"), Err(QError::Type));
+    assert_eq!(l("9223372036854775807 1 + 1"), Err(QError::Overflow));
+    // right to left, and the negative-literal trap
+    assert_eq!(l("1 2 3 * 2 + 1"), Ok(longs(&[3, 6, 9])));
+    assert_eq!(l("2 -1 + 1"), Ok(longs(&[3, 0])));
+}
+
+#[test]
+fn vec_lit_float_suffix_only_on_the_last_item() {
+    for src in ["1f 2", "1 2f 3", "1.5f 2", "1f -2", "1f 0N"] {
+        assert!(
+            matches!(eval(src), Err(QError::Parse(m)) if m.starts_with("invalid literal: ")),
+            "{src}"
+        );
     }
-    // scalar arithmetic around a literal still evaluates right to left
-    assert_eq!(eval("1 + 2 * 3"), Ok(Value::Atom(Atom::Integer(7))));
-    assert_eq!(eval("2 * 3 - 1"), Ok(Value::Atom(Atom::Integer(4))));
+    assert_eq!(eval("1 2 3f"), Ok(floats(&[1.0, 2.0, 3.0])));
+    assert_eq!(eval("1 2.5 3f"), Ok(floats(&[1.0, 2.5, 3.0])));
+    assert_eq!(eval("2f"), Ok(Value::Atom(Atom::Float(2.0))));
+    assert_eq!(eval("1.0 2"), Ok(floats(&[1.0, 2.0])));
+    assert_eq!(eval("1f - 2"), Ok(Value::Atom(Atom::Float(-1.0))));
+    assert_eq!(eval("1f /c"), Ok(Value::Atom(Atom::Float(1.0))));
 }
 
 #[test]
@@ -252,7 +277,7 @@ proptest! {
     #[test]
     fn vec_lit_float_roundtrip(v in proptest::collection::vec(-100_000i64..=100_000, 2..50)) {
         let f: Vec<f64> = v.iter().map(|&n| n as f64).collect();
-        let src = v.iter().map(|n| format!("{n}f")).collect::<Vec<_>>().join(" ");
+        let src = format!("{}f", run_text(&v));
         let got = eval(&src).unwrap();
         prop_assert_eq!(&got, &floats(&f));
         prop_assert_eq!(eval(&got.to_string()).unwrap(), got);

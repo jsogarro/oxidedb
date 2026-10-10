@@ -11,7 +11,7 @@ oxidedb> x:5
 5
 ```
 
-When you assign a value to a variable, O returns the value that was assigned. The variable `x` now contains the value `5`.
+When you assign a value to a variable, O returns the value that was assigned. (q prints nothing for an assignment; O currently shows the assigned value.) The variable `x` now contains the value `5`.
 
 ## Retrieving Variable Values
 

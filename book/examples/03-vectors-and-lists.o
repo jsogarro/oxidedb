@@ -1,5 +1,7 @@
 // Chapter 3: Vectors and Lists Examples
-// Vector literals: longs, floats, booleans, symbols and strings
+// Vector literals: longs, floats, booleans, symbols and strings, and arithmetic on them
+// Lines whose expected output starts with a quote are errors: `cargo run` stops at the first one,
+// while `cargo test --test book_examples` checks every line.
 
 // Long vectors
 // Expected output: 1 2 3
@@ -105,3 +107,83 @@ tags:`red`green
 
 // Expected output: 0n 1.5
 0N 1.5
+
+// Arithmetic on vectors
+// Expected output: 11 12 13
+1 2 3 + 10
+
+// Expected output: 2 3 4
+1 2 3 + 1
+
+// Expected output: 2 3 4
+1 + 1 2 3
+
+// Expected output: 20 40 60
+10 20 30 * 2
+
+// Expected output: 5 7 9
+1 2 3 + 4 5 6
+
+// Expected output: 4 10 18
+1 2 3 * 4 5 6
+
+// Expected output: 'length
+1 2 3 + 4 5
+
+// Right to left: 1 2 3 * (2 + 1)
+// Expected output: 3 6 9
+1 2 3 * 2 + 1
+
+// Expected output: 0.5 1 1.5
+1 2 3 % 2
+
+// Expected output: 1.5 2.5 3.5
+1 2 3 + 0.5
+
+// Expected output: 2 1 2
+101b + 1
+
+// Expected output: 2 0N 4
+1 0N 3 + 1
+
+// Expected output: 2 0n 4
+1 0n 3 + 1
+
+// Expected output: 'overflow
+9223372036854775807 1 + 1
+
+// Expected output: 'type
+`a`b + 1
+
+// Expected output: 'type
+"abc" + 1
+
+// Expected output: -1 -2 -3
+- 1 2 3
+
+// Expected output: -1 2 3
+-1 2 3
+
+// The negative-literal trap with arithmetic
+// Expected output: 3 0
+2 -1 + 1
+
+// Expected output: 0
+2 - 1 + 1
+
+// Expected output: 5
+x:5
+
+// Expected output: 'nyi: application
+x -1 + 1
+
+// Exercise: Celsius to Fahrenheit, right to left
+// Expected output: 20 25 30
+c:20 25 30
+
+// Expected output: 68 77 86f
+32 + c * 9 % 5
+
+// The f suffix is only valid on the last item
+// Expected output: 'parse: invalid literal: 1f...
+1f 2

@@ -365,13 +365,13 @@ fn checker_reports_wrong_and_missing_expectations() {
 
 #[test]
 fn checker_errors_are_q_style() {
-    let md = "```\noxidedb> 1b + 1\n'type\noxidedb> nope\n'nope (Undefined variable)\n```\n";
+    let md = "```\noxidedb> 1 + \"a\"\n'type\noxidedb> nope\n'nope (Undefined variable)\n```\n";
     assert_eq!(check_chapter("f.md", md), Vec::<String>::new());
-    let stale = "```\noxidedb> 1b + 1\nError: Invalid binary operation\n```\n";
+    let stale = "```\noxidedb> 1 + \"a\"\nError: Invalid binary operation\n```\n";
     assert!(reports(&check_chapter("f.md", stale), "actual:   'type"));
     // an error with no expectation is a problem
     assert!(reports(
-        &check_o_file("f.o", "// Expected output: 1\n1\n1b + 1\n"),
+        &check_o_file("f.o", "// Expected output: 1\n1\n1 + \"a\"\n"),
         "failed unexpectedly: 'type"
     ));
 }
