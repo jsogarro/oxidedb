@@ -352,7 +352,116 @@ oxidedb> `a = 1
 'type
 ```
 
+### Floats are compared exactly
+Floats are compared bit for bit, with no tolerance. Most decimal fractions cannot be stored exactly, so a sum that looks like `0.3` can differ from `0.3` in the last place, and `=` reports it. q compares floats with a small tolerance and says yes here, so this is a deliberate difference from q (`(0.1+0.2)=0.3` is `1b` in q):
+```
+oxidedb> (0.1+0.2) = 0.3
+0b
+oxidedb> (0.1+0.2) < 0.3
+0b
+oxidedb> (0.1+0.2) > 0.3
+1b
+oxidedb> (0.5+0.25) = 0.75
+1b
+```
+Sums of halves and quarters are exact in binary, so that last one is true.
+
 You may be tempted to count how many items match, for example how many entries of `v>1` are true. That needs a way to add up a vector, which does not exist yet, so for now the boolean vector is the answer.
+
+## Take (`#`)
+
+`n # v` takes the first `n` items of `v`. The count goes on the left, the list on the right:
+```
+oxidedb> 2#1 2 3
+1 2
+oxidedb> 3#"hello"
+"hel"
+```
+If the count is larger than the list, take wraps around and starts again. A negative count takes from the end, and wraps the same way:
+```
+oxidedb> 5#1 2
+1 2 1 2 1
+oxidedb> -2#1 2 3
+2 3
+oxidedb> -5#1 2 3
+2 3 1 2 3
+```
+Taking nothing keeps the type, and the display of an empty typed vector says which type it is:
+```
+oxidedb> 0#1 2
+`long$()
+oxidedb> 0#`a`b
+`symbol$()
+oxidedb> 0#"ab"
+""
+```
+Taking from an atom repeats it, which is the easy way to make a constant vector. A negative count of an atom gives the same thing, and `-1#7` is a one-item vector (it prints with a leading comma):
+```
+oxidedb> 3#7
+7 7 7
+oxidedb> 3#"a"
+"aaa"
+oxidedb> 3#`a
+`a`a`a
+oxidedb> -1#7
+,7
+```
+Like every verb, take is right to left, so `2#1 2 3 + 1` is `2#(1 2 3 + 1)`. The count must be a long (a float count is a `'type` error). A list of counts would reshape the data into rows, which O does not do yet, and a count above 10,000,000 items is a `'domain` error (an O limit; q would try to allocate):
+```
+oxidedb> 2#1 2 3 + 1
+2 3
+oxidedb> 2.0#1 2 3
+'type
+oxidedb> 1 2#1 2 3
+'nyi: reshape
+oxidedb> 1000000000#1
+'domain
+```
+
+## Join (`,`)
+
+`x , y` puts two lists end to end. An atom counts as a one-item list:
+```
+oxidedb> 1 2,3 4
+1 2 3 4
+oxidedb> 1,2 3
+1 2 3
+oxidedb> 1 2,3
+1 2 3
+oxidedb> "ab","c"
+"abc"
+oxidedb> `a`b,`c
+`a`b`c
+```
+An empty list on either side disappears:
+```
+oxidedb> 1 2,0#1 2
+1 2
+oxidedb> (0#1 2),1 2
+1 2
+```
+Join **never converts types**. When the two sides have the same type the result is a vector, but joining a long with a float gives a *general list*, a list whose items keep their own types, not a float vector. A general list is displayed one item per line (O's display of nested lists will be refined later), and you cannot yet type one directly:
+```
+oxidedb> 1,2.5
+1
+2.5
+oxidedb> 1 2,3.0
+1
+2
+3f
+oxidedb> 1,"a"
+1
+"a"
+```
+This is the same in q. Compare this with the literal `1 2.5`, which the reader promotes to a float vector before join is ever involved. And because `,` is just another verb, the right-to-left rule applies: `1 2,3 = 3` is `1 2,(3 = 3)`, a long vector joined to a boolean, so it is a general list too, while `(1 2,3) = 1 2 4` compares the joined vector:
+```
+oxidedb> 1 2,3 = 3
+1
+2
+1b
+oxidedb> (1 2,3) = 1 2 4
+110b
+```
 
 ## Unfinished Business
 
@@ -386,7 +495,6 @@ These parts of the chapter will be added as the features arrive. None of them wo
 
 - `til` and `count`
 - indexing a vector
-- take (`#`) and join (`,`)
 - general (mixed or nested) lists, written with parentheses and semicolons
 - assigning to an item of a vector
 
@@ -414,4 +522,5 @@ These parts of the chapter will be added as the features arrive. None of them wo
 - A null inside a float vector is `0n`
 - `= <> < <= > >=` compare item by item and give booleans (`1b`, or a boolean vector like `101b`); null equals null and sorts lowest; comparing across kinds is `'type`; `=` asks, `:` assigns
 - `+ - * %` work item by item on vectors: an atom is paired with every item, two vectors pair up if they have the same length (`'length` otherwise), `%` gives floats, and symbols and strings are `'type`
+- `n#v` takes the first `n` items (wrapping; negative from the end; an atom repeats); `x,y` joins and never converts types, so `1,2.5` is a general list; `!` and reshape are still to come
 - Indexing, `til`, `count` and the rest are still to come
