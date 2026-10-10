@@ -18,6 +18,10 @@
 // Expected output: -2.5
 -2.5
 
+// Leading-dot float and a trailing comment
+// Expected output: 0.5
+.5 / the zero before the dot is optional
+
 // Boolean Values
 // Expected output: 1b
 1b

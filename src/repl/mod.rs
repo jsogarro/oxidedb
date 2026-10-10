@@ -1,4 +1,8 @@
-use crate::language::{interpreter::Interpreter, lexer::Lexer, parser::Parser};
+use crate::language::{
+    interpreter::Interpreter,
+    lexer::{Lexer, Token},
+    parser::Parser,
+};
 use anyhow::Result;
 use colored::*;
 use rustyline::DefaultEditor;
@@ -40,7 +44,8 @@ impl Repl {
                     let _ = self.editor.add_history_entry(line);
 
                     match self.evaluate(line) {
-                        Ok(result) => println!("{}", result),
+                        Ok(Some(result)) => println!("{}", result),
+                        Ok(None) => {}
                         Err(e) => println!("{}: {}", "Error".red(), e),
                     }
                 }
@@ -59,15 +64,13 @@ impl Repl {
         for (line_num, line) in content.lines().enumerate() {
             let line = line.trim();
 
-            // Skip empty lines and comments
-            if line.is_empty() || line.starts_with("//") {
+            if line.is_empty() {
                 continue;
             }
 
             match self.evaluate(line) {
-                Ok(result) => {
-                    println!("{}", result);
-                }
+                Ok(Some(result)) => println!("{}", result),
+                Ok(None) => {}
                 Err(e) => {
                     eprintln!("{} at line {}: {}", "Error".red(), line_num + 1, e);
                     return Err(e);
@@ -78,14 +81,18 @@ impl Repl {
         Ok(())
     }
 
-    fn evaluate(&mut self, input: &str) -> Result<String> {
+    /// Returns `None` for input with no tokens (e.g. a comment-only line).
+    fn evaluate(&mut self, input: &str) -> Result<Option<String>> {
         let mut lexer = Lexer::new(input);
         let tokens = lexer.tokenize()?;
+        if tokens == [Token::Eof] {
+            return Ok(None);
+        }
 
         let mut parser = Parser::new(tokens);
         let ast = parser.parse()?;
 
         let result = self.interpreter.evaluate(ast)?;
-        Ok(format!("{}", result))
+        Ok(Some(format!("{}", result)))
     }
 }
