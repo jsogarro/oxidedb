@@ -68,7 +68,8 @@ fn neg_literal_keeps_arithmetic() {
 #[test]
 fn lex_bool_only_for_single_digit() {
     let sym = |s: &str| Token::Symbol(s.into());
-    assert_eq!(lex("10b"), vec![Token::Integer(10), sym("b")]);
+    // `10b` is a boolean vector now (see tests/lex_lists.rs).
+    assert_eq!(lex("10b"), vec![Token::BoolList(vec![true, false])]);
     assert_eq!(lex("0b1"), vec![Token::Integer(0), sym("b1")]);
     assert_eq!(lex("1bc"), vec![Token::Integer(1), sym("bc")]);
     assert_eq!(lex("1b_"), vec![Token::Integer(1), sym("b_")]);

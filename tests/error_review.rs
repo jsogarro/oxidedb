@@ -72,8 +72,8 @@ fn triple_quote_is_still_a_quote_character() {
 
 #[test]
 fn symbols_are_not_yet_implemented() {
-    assert_eq!(lex_err("`a"), QError::Nyi("symbols".into()));
-    assert_eq!(lex_err("`a").to_string(), "'nyi: symbols");
+    assert_eq!(eval_err("`a"), QError::Nyi("symbols".into()));
+    assert_eq!(eval_err("`a").to_string(), "'nyi: symbols");
 }
 
 #[test]

@@ -10,6 +10,14 @@ pub enum Token {
     Boolean(bool),
     Character(char),
     Symbol(String),
+    /// `` `abc ``; a lone backtick is the null symbol `Sym("")`.
+    Sym(String),
+    /// A glued run of two or more symbols: `` `a`b`c ``.
+    SymList(Vec<String>),
+    /// `"abc"` or `""` (a one-character literal is `Character`).
+    Str(String),
+    /// `101b`: two or more digits of 0/1.
+    BoolList(Vec<bool>),
 
     // Operators
     Plus,
@@ -44,6 +52,27 @@ impl fmt::Display for Token {
             Token::Boolean(b) => write!(f, "{}", Atom::Boolean(*b)),
             Token::Character(c) => write!(f, "{}", Atom::Character(*c)),
             Token::Symbol(s) => write!(f, "{}", s),
+            Token::Sym(s) => write!(f, "`{s}"),
+            Token::SymList(names) => names.iter().try_for_each(|s| write!(f, "`{s}")),
+            Token::Str(s) => {
+                write!(f, "\"")?;
+                for c in s.chars() {
+                    match c {
+                        '"' => write!(f, "\\\"")?,
+                        '\\' => write!(f, "\\\\")?,
+                        '\n' => write!(f, "\\n")?,
+                        '\t' => write!(f, "\\t")?,
+                        '\r' => write!(f, "\\r")?,
+                        c => write!(f, "{c}")?,
+                    }
+                }
+                write!(f, "\"")
+            }
+            Token::BoolList(bits) => {
+                bits.iter()
+                    .try_for_each(|b| write!(f, "{}", u8::from(*b)))?;
+                write!(f, "b")
+            }
             Token::Plus => write!(f, "+"),
             Token::Minus => write!(f, "-"),
             Token::Multiply => write!(f, "*"),
@@ -170,7 +199,7 @@ impl Lexer {
                 ch if ch.is_ascii_digit() => self.read_number(),
                 ch if ch.is_ascii_alphabetic() => self.read_identifier(),
                 ch if ch.is_alphanumeric() || ch == '_' => Err(bad_identifier_char(ch)),
-                '`' => Err(QError::Nyi("symbols".into())),
+                '`' => Ok(self.read_symbols()),
                 _ => Err(QError::parse(format!("unexpected character: {ch}"))),
             },
         }
@@ -232,6 +261,10 @@ impl Lexer {
                 | Token::Boolean(_)
                 | Token::Character(_)
                 | Token::Symbol(_)
+                | Token::Sym(_)
+                | Token::SymList(_)
+                | Token::Str(_)
+                | Token::BoolList(_)
                 | Token::RightParen
                 | Token::RightBracket,
             ) => spaced,
@@ -267,6 +300,28 @@ impl Lexer {
         {
             self.advance();
             return Ok(Token::Boolean(number == "1"));
+        }
+
+        // `101b`: two or more digits glued to a `b`.
+        if self.current_char == Some('b')
+            && number.len() >= 2
+            && number.chars().all(|c| c.is_ascii_digit())
+        {
+            let bits: Option<Vec<bool>> = number
+                .chars()
+                .map(|c| match c {
+                    '0' => Some(false),
+                    '1' => Some(true),
+                    _ => None,
+                })
+                .collect();
+            return match bits {
+                Some(bits) if !self.ident_char_at(1) => {
+                    self.advance();
+                    Ok(Token::BoolList(bits))
+                }
+                _ => Err(QError::parse(format!("invalid literal: {number}b..."))),
+            };
         }
 
         // Null and infinity literals: `0N` `0n` `0w` (optionally negative).
@@ -351,26 +406,69 @@ impl Lexer {
         Ok(Token::Symbol(identifier))
     }
 
+    /// `` `a ``, `` ` `` or a glued run `` `a`b ``; the lexer is on a backtick.
+    fn read_symbols(&mut self) -> Token {
+        let mut names = Vec::new();
+        while self.current_char == Some('`') {
+            self.advance();
+            let mut name = String::new();
+            while let Some(ch) = self
+                .current_char
+                .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.'))
+            {
+                name.push(ch);
+                self.advance();
+            }
+            names.push(name);
+        }
+        if names.len() == 1 {
+            Token::Sym(names.remove(0))
+        } else {
+            Token::SymList(names)
+        }
+    }
+
+    /// `"c"` is a character, anything else between quotes a string. A `\` escape
+    /// (`\" \\ \n \t \r`) is one character of the body.
     fn read_character(&mut self) -> QResult<Token> {
         self.advance(); // Skip opening quote
 
-        let unterminated = || QError::parse("unterminated character literal");
-        let ch = self.current_char.ok_or_else(unterminated)?;
-        self.advance();
-
+        // `""` is the empty string; `"""` stays the quote character.
         if self.current_char == Some('"') {
-            self.advance(); // Skip closing quote
-            return Ok(Token::Character(ch));
+            self.advance();
+            if self.current_char == Some('"') {
+                self.advance();
+                return Ok(Token::Character('"'));
+            }
+            return Ok(Token::Str(String::new()));
         }
-        // Not one character. A closing quote means a well-formed string,
-        // which O does not have yet; without one the literal is cut off.
-        let closed = ch == '"' || self.input[self.position..].contains(&'"');
-        if closed {
-            Err(QError::Nyi(
-                "strings (a character literal holds exactly one character)".into(),
-            ))
-        } else {
-            Err(unterminated())
+
+        let unterminated = || QError::parse("unterminated character literal");
+        let mut body = Vec::new();
+        loop {
+            let ch = self.current_char.ok_or_else(unterminated)?;
+            self.advance();
+            match ch {
+                '"' => break,
+                '\\' => {
+                    let esc = self.current_char.ok_or_else(unterminated)?;
+                    self.advance();
+                    body.push(match esc {
+                        '"' | '\\' => esc,
+                        'n' => '\n',
+                        't' => '\t',
+                        'r' => '\r',
+                        _ => {
+                            return Err(QError::parse(format!("invalid escape: \\{esc} in string")))
+                        }
+                    });
+                }
+                _ => body.push(ch),
+            }
         }
+        Ok(match body[..] {
+            [c] => Token::Character(c),
+            _ => Token::Str(body.into_iter().collect()),
+        })
     }
 }
