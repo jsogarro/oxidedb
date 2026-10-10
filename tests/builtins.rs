@@ -1,5 +1,5 @@
 use oxidedb::language::builtins::{call, lookup, Builtin};
-use oxidedb::types::column::Column;
+use oxidedb::types::column::{checked_len, Column, MAX_ELEMS};
 use oxidedb::types::sym::Sym;
 use oxidedb::{Atom, QError, Value};
 use proptest::prelude::*;
@@ -32,10 +32,45 @@ fn builtin_til_negative_is_domain() {
 }
 
 #[test]
-fn builtin_til_huge_is_domain_without_allocating() {
-    assert_eq!(til(100_000_001), Err(QError::Domain));
+fn builtin_til_moderate_allocation() {
+    let Value::Vector(c) = til(100_000).unwrap() else {
+        panic!("not a vector")
+    };
+    assert_eq!(c.len(), 100_000);
+    assert_eq!(c.get(99_999), Atom::Integer(99_999));
+}
+
+#[test]
+fn builtin_til_over_cap_is_domain() {
+    assert_eq!(til(MAX_ELEMS as i64 + 1), Err(QError::Domain));
     assert_eq!(til(i64::MAX), Err(QError::Domain));
-    assert_eq!(til(100_000_000).unwrap().type_code(), 7);
+}
+
+#[test]
+fn builtin_checked_len_boundaries() {
+    let cap = MAX_ELEMS as i64;
+    assert_eq!(MAX_ELEMS, 10_000_000);
+    assert_eq!(checked_len(0), Ok(0));
+    assert_eq!(checked_len(1), Ok(1));
+    assert_eq!(checked_len(cap - 1), Ok(MAX_ELEMS - 1));
+    assert_eq!(checked_len(cap), Ok(MAX_ELEMS));
+    assert_eq!(checked_len(cap + 1), Err(QError::Domain));
+    assert_eq!(checked_len(-1), Err(QError::Domain));
+    assert_eq!(checked_len(i64::MIN), Err(QError::Domain));
+    assert_eq!(checked_len(i64::MAX), Err(QError::Domain));
+}
+
+#[test]
+fn builtin_enum_api() {
+    assert_eq!(Builtin::Til.name(), "til");
+    assert_eq!(Builtin::Count.name(), "count");
+    assert_eq!(Builtin::Til.arity(), 1);
+    assert_eq!(Builtin::Count.arity(), 1);
+    assert_eq!(Builtin::Til.call(&[int(3)]).unwrap(), longs(&[0, 1, 2]));
+    assert_eq!(Builtin::Count.call(&[]), Err(QError::Rank));
+    for b in [Builtin::Til, Builtin::Count] {
+        assert_eq!(lookup(b.name()), Some(b));
+    }
 }
 
 #[test]

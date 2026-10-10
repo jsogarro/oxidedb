@@ -10,13 +10,13 @@ OxideDB is currently a small q-inspired expression interpreter (the **O** langua
 - `parser.rs`: builds an `Expr` from the tokens.
 - `ast.rs`: `Expr` (atom, symbol, binary op, unary op, assignment) the negate operator, and `Verb`, the binary verbs `+ - * % = < > <> <= >= # , !`. The parser produces only `+ - * %`; the rest are placeholders that evaluate to `'nyi`.
 - `interpreter.rs`: evaluates an `Expr` against a `HashMap<String, Value>` of variables. `Interpreter::eval_line` runs the whole pipeline for one line.
+- `builtins.rs`: `lookup(name)` resolves a keyword to a `Builtin` (`name`, `arity`, `call`); `call(name, args)` wraps it. Keywords: `til` and `count`. `til` and `Column::take` share the `MAX_ELEMS` cap (10,000,000 elements, `'domain` beyond it). The interpreter does not resolve names to them yet.
 
 ### `src/types/`
 
 - `atom.rs`: the scalar `Atom` enum (boolean, long, float, character, symbol, date, time, timestamp, and typed temporal nulls) with q type codes and q-style display.
 - `sym.rs`: interned symbols, a 4-byte handle into a process-global string table. Interned names are never freed.
 - `column.rs`: `Column`, a typed vector (bool, long, float, char, symbol). It is reachable through `Value::Vector`, but the language cannot create one yet. `index` (typed gather, typed nulls for bad indices), `take` (q `#`, cyclic, negative from the end) and `concat` (same type only) are the helpers indexing, take and join build on.
-- `builtins.rs` (in `src/language/`): `lookup(name)` and `call(name, args)` for the one-argument keywords `til` (capped at 100,000,000 elements) and `count`. The interpreter does not resolve names to them yet.
 - `value.rs`: `Value`, the result of evaluation (atom, vector or general list), its equality and display.
 - `display.rs`: q-style `Display` for `Column` (`1 2 3`, `1 2 3f`, `101b`, `` `a`b ``, `"abc"`) and the character escaping shared with `Atom`'s `Display`.
 

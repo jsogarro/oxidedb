@@ -1,5 +1,17 @@
 use super::atom::{float_eq, Atom};
 use super::sym::Sym;
+use crate::error::{QError, QResult};
+
+/// Largest vector a single operation (`til`, `take`) may build: 80 MB of longs.
+pub const MAX_ELEMS: usize = 10_000_000;
+
+/// Validate a requested element count: `0..=MAX_ELEMS`, else `'domain`.
+pub fn checked_len(n: i64) -> QResult<usize> {
+    usize::try_from(n)
+        .ok()
+        .filter(|&n| n <= MAX_ELEMS)
+        .ok_or(QError::Domain)
+}
 
 /// A typed vector. Mixed data is never a `Column`.
 #[derive(Debug, Clone)]
@@ -112,17 +124,17 @@ impl Column {
 
     /// q `#`: the first `n` elements, wrapping cyclically past the end; a
     /// negative `n` takes `-n` elements ending at the last one, also wrapping.
-    /// Taking from an empty column gives `|n|` typed nulls.
-    // ponytail: the result length is |n|; callers must bound `n` (the language slice owns the limit).
-    pub fn take(&self, n: i64) -> Column {
+    /// Taking from an empty column gives `|n|` typed nulls. `'domain` when
+    /// `|n|` exceeds `MAX_ELEMS`.
+    pub fn take(&self, n: i64) -> QResult<Column> {
+        let count = checked_len(n.checked_abs().ok_or(QError::Domain)?)?;
         let len = self.len();
-        let count = n.unsigned_abs() as usize;
         if len == 0 {
-            return self.index(&vec![-1; count]);
+            return Ok(self.index(&vec![-1; count]));
         }
         let start = if n < 0 { (len - count % len) % len } else { 0 };
         let idx: Vec<i64> = (0..count).map(|k| ((start + k) % len) as i64).collect();
-        self.index(&idx)
+        Ok(self.index(&idx))
     }
 
     /// Join two columns of the same type; `None` when the types differ so the

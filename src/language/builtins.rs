@@ -3,12 +3,9 @@
 
 use crate::error::{QError, QResult};
 use crate::types::atom::Atom;
-use crate::types::column::Column;
+use crate::types::column::{checked_len, Column};
 use crate::types::value::Value;
 use std::rc::Rc;
-
-/// Largest `til n` allowed, so a typo cannot exhaust memory.
-pub const MAX_TIL: i64 = 100_000_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Builtin {
@@ -24,27 +21,45 @@ pub fn lookup(name: &str) -> Option<Builtin> {
     }
 }
 
-/// Call the builtin `name`. Every current builtin takes exactly one argument
-/// (`'rank` otherwise); an unknown name is `'name (Undefined variable)`.
-pub fn call(name: &str, args: &[Value]) -> QResult<Value> {
-    let b = lookup(name).ok_or_else(|| QError::Undefined(name.to_string()))?;
-    let [x] = args else {
-        return Err(QError::Rank);
-    };
-    match b {
-        Builtin::Til => til(x),
-        Builtin::Count => Ok(count(x)),
+impl Builtin {
+    pub fn name(self) -> &'static str {
+        match self {
+            Builtin::Til => "til",
+            Builtin::Count => "count",
+        }
     }
+
+    pub fn arity(self) -> usize {
+        match self {
+            Builtin::Til | Builtin::Count => 1,
+        }
+    }
+
+    /// `'rank` when `args` does not match the arity.
+    pub fn call(self, args: &[Value]) -> QResult<Value> {
+        if args.len() != self.arity() {
+            return Err(QError::Rank);
+        }
+        match self {
+            Builtin::Til => til(&args[0]),
+            Builtin::Count => Ok(count(&args[0])),
+        }
+    }
+}
+
+/// Call the builtin `name`; an unknown name is `'name (Undefined variable)`.
+pub fn call(name: &str, args: &[Value]) -> QResult<Value> {
+    lookup(name)
+        .ok_or_else(|| QError::Undefined(name.to_string()))?
+        .call(args)
 }
 
 fn til(x: &Value) -> QResult<Value> {
     let Value::Atom(Atom::Integer(n)) = x else {
         return Err(QError::Type);
     };
-    if !(0..=MAX_TIL).contains(n) {
-        return Err(QError::Domain);
-    }
-    Ok(Value::Vector(Rc::new(Column::Long((0..*n).collect()))))
+    let n = checked_len(*n)? as i64;
+    Ok(Value::Vector(Rc::new(Column::Long((0..n).collect()))))
 }
 
 fn count(x: &Value) -> Value {
