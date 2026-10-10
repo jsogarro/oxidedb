@@ -124,6 +124,29 @@ impl Column {
         }
     }
 
+    /// Amend: element `pos[k]` becomes `src[k]` (a one-element `src` is broadcast), so with a
+    /// duplicate position the last one wins. `'type` unless `src` has this column's type, in
+    /// which case nothing is changed. The caller has checked that every position is in range
+    /// and that `src` has one element or `pos.len()`.
+    pub fn assign(&mut self, pos: &[usize], src: &Column) -> QResult<()> {
+        fn put<T: Copy>(dst: &mut [T], pos: &[usize], src: &[T]) {
+            if let [x] = src {
+                pos.iter().for_each(|&p| dst[p] = *x);
+            } else {
+                pos.iter().zip(src).for_each(|(&p, x)| dst[p] = *x);
+            }
+        }
+        match (self, src) {
+            (Column::Bool(d), Column::Bool(s)) => put(d, pos, s),
+            (Column::Long(d), Column::Long(s)) => put(d, pos, s),
+            (Column::Float(d), Column::Float(s)) => put(d, pos, s),
+            (Column::Char(d), Column::Char(s)) => put(d, pos, s),
+            (Column::Sym(d), Column::Sym(s)) => put(d, pos, s),
+            _ => return Err(QError::Type),
+        }
+        Ok(())
+    }
+
     /// q `#`: the first `n` elements, wrapping cyclically past the end; a
     /// negative `n` takes `-n` elements ending at the last one, also wrapping.
     /// Taking from an empty column gives `|n|` typed nulls. `'domain` when

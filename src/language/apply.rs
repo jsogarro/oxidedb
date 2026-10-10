@@ -6,6 +6,7 @@ use crate::error::{QError, QResult};
 use crate::types::atom::Atom;
 use crate::types::column::Column;
 use crate::types::value::Value;
+use crate::types::value::{Sizer, MAX_LOGICAL_ITEMS, MAX_VALUE_DEPTH};
 use std::rc::Rc;
 
 /// `f[args]`. No arguments gives `f` back; a vector takes one index.
@@ -63,5 +64,138 @@ fn index(f: &Value, i: &Value) -> QResult<Value> {
             let out = items.iter().map(|x| index(f, x));
             Ok(Value::from_items(out.collect::<QResult<_>>()?))
         }
+    }
+}
+
+/// `target[idx]:val`, in place (copy-on-write when the vector is shared). Checked in q's order,
+/// and nothing changes on an error: the index must be long or boolean atoms (`'type`), every
+/// position in range (`'length`, where a read gives a null), the value's count must fit
+/// (`'length`), and for a vector its type must match exactly (`'type`: no promotion); for a
+/// general list the new items must not nest past `MAX_VALUE_DEPTH` (`'limit`). An atom cannot
+/// be amended. A general list takes any value; one that ends up with all items of one atom
+/// type collapses to a vector, as in q.
+pub fn amend(target: &mut Value, idx: &Value, val: &Value) -> QResult<()> {
+    let len = match target {
+        Value::Atom(_) => return Err(QError::Type),
+        Value::Vector(c) => c.len(),
+        Value::List(items) => items.len(),
+    };
+    let (positions, scalar) = match idx {
+        Value::Atom(a) => (vec![position(a)?], true),
+        Value::Vector(c) => match &**c {
+            Column::Long(v) => (v.clone(), false),
+            Column::Bool(v) => (v.iter().map(|&b| i64::from(b)).collect(), false),
+            _ => return Err(QError::Type),
+        },
+        // an empty general list is an empty index: nothing changes, whatever the value
+        Value::List(items) if items.is_empty() => return Ok(()),
+        // a general list of long and boolean atoms indexes like a vector of them
+        Value::List(items) => {
+            let each = items.iter().map(|x| match x {
+                Value::Atom(a) => position(a),
+                _ => Err(QError::Type),
+            });
+            (each.collect::<QResult<Vec<i64>>>()?, false)
+        }
+    };
+    let pos = positions
+        .iter()
+        .map(|&p| usize::try_from(p).ok().filter(|&p| p < len))
+        .collect::<Option<Vec<usize>>>()
+        .ok_or(QError::Length)?;
+    // One item per position, or a single item broadcast.
+    let count_fits = |n: usize| n == pos.len();
+    match target {
+        Value::Vector(col) => {
+            let src = match val {
+                Value::Atom(a) => {
+                    Column::from_atoms(std::slice::from_ref(a)).ok_or(QError::Type)?
+                }
+                _ if scalar => return Err(QError::Type),
+                Value::Vector(c) if count_fits(c.len()) => (**c).clone(),
+                Value::List(items) if count_fits(items.len()) => {
+                    let atoms: Option<Vec<Atom>> = items
+                        .iter()
+                        .map(|x| match x {
+                            Value::Atom(a) => Some(a.clone()),
+                            _ => None,
+                        })
+                        .collect();
+                    atoms
+                        .as_deref()
+                        .and_then(Column::from_atoms)
+                        .ok_or(QError::Type)?
+                }
+                _ => return Err(QError::Length),
+            };
+            // before make_mut, so a failing assignment does not copy a shared vector
+            if src.type_code() != col.type_code() {
+                return Err(QError::Type);
+            }
+            Rc::make_mut(col).assign(&pos, &src)
+        }
+        Value::List(items) => {
+            let new: Vec<Value> = match val {
+                Value::Atom(_) => vec![val.clone()],
+                _ if scalar => vec![val.clone()],
+                Value::Vector(c) if count_fits(c.len()) => {
+                    (0..c.len()).map(|k| Value::Atom(c.get(k))).collect()
+                }
+                Value::List(l) if count_fits(l.len()) => l.to_vec(),
+                _ => return Err(QError::Length),
+            };
+            // O(size of what goes in): shared lists are visited once
+            new.iter().try_for_each(|x| x.check_nesting(1))?;
+            // The list's size after the change: what it holds now, minus the items replaced
+            // (the last value written to a position wins), plus the items that replace them.
+            // An atom is the smallest item (size 1), so replacing items by atoms cannot grow
+            // the list, and that common case skips the walk. Sharing is memoised: linear in
+            // the distinct lists, never in the paths.
+            if new.iter().any(|x| !matches!(x, Value::Atom(_))) {
+                let mut sizer = Sizer::default();
+                let room = MAX_VALUE_DEPTH;
+                let mut last = std::collections::HashMap::new();
+                for (k, &p) in pos.iter().enumerate() {
+                    last.insert(p, if new.len() == 1 { 0 } else { k });
+                }
+                let mut total = items
+                    .iter()
+                    .fold(1u64, |n, x| n.saturating_add(sizer.size(x, room)));
+                if total != u64::MAX {
+                    for (&p, &k) in &last {
+                        total -= sizer.size(&items[p], room);
+                        total = total.saturating_add(sizer.size(&new[k], room));
+                    }
+                }
+                if total > MAX_LOGICAL_ITEMS as u64 {
+                    return Err(QError::Limit(format!(
+                        "value larger than {MAX_LOGICAL_ITEMS} items"
+                    )));
+                }
+            }
+            let list = Rc::make_mut(items);
+            for (k, &p) in pos.iter().enumerate() {
+                list[p] = if new.len() == 1 {
+                    new[0].clone()
+                } else {
+                    new[k].clone()
+                };
+            }
+            // Collapse only when every item is an atom of one type; stop at the first that is not.
+            let first = list.first().map(|x| match x {
+                Value::Atom(a) => Some(std::mem::discriminant(a)),
+                _ => None,
+            });
+            if let Some(Some(kind)) = first {
+                let uniform = list
+                    .iter()
+                    .all(|x| matches!(x, Value::Atom(a) if std::mem::discriminant(a) == kind));
+                if uniform {
+                    *target = Value::from_items(std::mem::take(list));
+                }
+            }
+            Ok(())
+        }
+        Value::Atom(_) => unreachable!("atoms are rejected above"),
     }
 }

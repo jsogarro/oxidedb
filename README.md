@@ -77,6 +77,7 @@ Phase 1 of the O language implementation is **complete** with a fully functional
 - ✅ **Vector Literals**: long, float, boolean, symbol and character vectors (strings)
 - ✅ **Vector Arithmetic**: `+ - * %` item by item, with broadcasting of atoms
 - ✅ **Application and indexing**: `til 3+2`, `count til 5`, `v[1]`, `v 0 2`, with q's right-to-left argument rule
+- ✅ **Item assignment**: `v[0]:5`, `v[0 2]:7 8`, copy-on-write, exact types (no promotion)
 - ✅ **Take and join**: `2#1 2 3` is `1 2`, `1 2,3 4` is `1 2 3 4`
 - ✅ **Comparison**: `= <> < <= > >=` on atoms and vectors (`1 2 3 = 1 5 3` is `101b`)
 - ✅ **Interactive REPL**: Full-featured environment with command history and error handling
@@ -98,7 +99,8 @@ Phase 1 of the O language implementation is **complete** with a fully functional
 - ✅ `til`, `count` and `neg`
 - ✅ Take and join (`#`, `,`)
 - ✅ Indexing (`v[i]`, `v i`, `v[0 2]`; out of range gives a null)
-- ⏳ Slicing and item assignment
+- ✅ Item assignment (`v[i]:x`, `v[0 2]:7 8`; the value must have the vector's type, out of range is `'length`, a shared copy is unchanged)
+- ⏳ Slicing
 - ✅ Vector arithmetic (`+ - * %` on atoms and vectors)
 - ✅ Comparison verbs in the language (`= <> < <= > >=`, giving booleans and boolean vectors)
 - ⏳ Type-preserving operations
@@ -179,7 +181,7 @@ Complete guide to the O programming language located in `/book/`:
 - **Introduction**: Overview of O and OxideDB
 - **Chapter 1**: Atoms and Basic Arithmetic
 - **Chapter 2**: Variables and Assignment
-- **Chapter 3**: Vectors and Lists (in progress: vector literals, arithmetic, comparison, `til`, `count`, indexing, take and join)
+- **Chapter 3**: Vectors and Lists (in progress: vector literals, arithmetic, comparison, `til`, `count`, indexing, item assignment, take and join)
 
 ### Executable Examples
 Run interactive examples from the book:

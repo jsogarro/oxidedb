@@ -437,15 +437,10 @@ fn apply_bracket_syntax_errors() {
     assert_eq!(err(&[V, "v[0;]"]), QError::Nyi("elided argument".into()));
     assert_eq!(err(&[V, "v[;1]"]), QError::Nyi("elided argument".into()));
     assert_eq!(err(&[V, "v[;]"]), QError::Nyi("elided argument".into()));
-    // item assignment is not built yet
-    assert_eq!(err(&[V, "v[0]:5"]), QError::Nyi("index assignment".into()));
+    // item assignment of a single index on a name is built (tests/index_assign.rs); deeper targets are not
     assert_eq!(
-        err(&[V, "1+v[0]:5"]),
-        QError::Nyi("index assignment".into())
-    );
-    assert_eq!(
-        err(&[V, "(v[0]):5"]),
-        QError::Nyi("index assignment".into())
+        err(&[V, "v[0][0]:5"]),
+        QError::Nyi("depth assignment".into())
     );
     // lambdas, adverbs and the other application forms keep their nyi
     assert_eq!(eval("{x} 1"), Err(QError::Nyi("{".into())));

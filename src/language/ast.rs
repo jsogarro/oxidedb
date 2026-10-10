@@ -23,6 +23,13 @@ pub enum Expr {
         name: String,
         value: Box<Expr>,
     },
+    /// `name[index]:value`: the target is always a plain name. No index (`name[]:value`)
+    /// means every item.
+    IndexAssignment {
+        name: String,
+        index: Option<Box<Expr>>,
+        value: Box<Expr>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -14,6 +14,19 @@ use crate::types::value::Value;
 
 /// Apply a binary verb. Verbs without a kernel yet give `'nyi: <verb>`.
 pub fn dyad(verb: Verb, left: &Value, right: &Value) -> QResult<Value> {
+    limited(dyad_unchecked(verb, left, right)?)
+}
+
+/// A list a verb returns must respect the nesting and size caps (`Value::check_nesting`):
+/// join and take can multiply a value that is within them.
+fn limited(result: Value) -> QResult<Value> {
+    if let Value::List(_) = result {
+        result.check_nesting(0)?;
+    }
+    Ok(result)
+}
+
+fn dyad_unchecked(verb: Verb, left: &Value, right: &Value) -> QResult<Value> {
     match verb {
         Verb::Add | Verb::Subtract | Verb::Multiply | Verb::Divide => {
             arith::dyad(verb, left, right)
@@ -41,7 +54,7 @@ pub(super) fn long_to_float(n: i64) -> f64 {
 
 /// Unary minus, atomic like the arithmetic verbs.
 pub fn monad_neg(v: &Value) -> QResult<Value> {
-    arith::neg(v)
+    limited(arith::neg(v)?)
 }
 
 /// An operand that is not a general list.

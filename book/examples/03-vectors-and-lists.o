@@ -524,3 +524,32 @@ p * q
 
 // Expected output: 18 36 54
 (10 20 30 - 1 2 3) * 2
+
+// Exercise 19: change items, one and several
+// Expected output: 1 2 3 4 5
+a:1 2 3 4 5
+
+// Expected output: 0
+a[2]:0
+
+// Expected output: 9 9
+a[0 4]:9
+
+// Expected output: 9 2 0 4 9
+a
+
+// Exercise 20: the copy stays unchanged, and a read past the end is a null
+// Expected output: 9 2 0 4 9
+b:a
+
+// Expected output: 7
+a[0]:7
+
+// Expected output: 7 2 0 4 9
+a
+
+// Expected output: 9 2 0 4 9
+b
+
+// Expected output: 0N
+a[5]

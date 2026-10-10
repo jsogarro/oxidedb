@@ -192,6 +192,43 @@ fn application_and_bracket_links_spend_from_the_budget() {
     .contains("nested too deeply"));
 }
 
+/// `v[0]:` + a `k`-operator chain, and the chain inside the index instead. `v` is unbound, so a
+/// line that parses ends in the evaluation error `'v (Undefined variable)`.
+#[test]
+fn index_assignment_spends_from_the_budget() {
+    let parses = |src: String| {
+        assert_eq!(
+            run_child(&src, 8192),
+            Err("'v (Undefined variable)".to_string())
+        )
+    };
+    // the line spends 1, the bracket link 1, the index 1, the value 1, each operator 1
+    let value = |k: usize| format!("v[0]:{}1", "1+".repeat(k));
+    parses(value(1996));
+    assert!(run_child(&value(1997), 8192)
+        .unwrap_err()
+        .contains("too long"));
+    let index = |k: usize| format!("v[{}1]:5", "1+".repeat(k));
+    parses(index(1996));
+    assert!(run_child(&index(1997), 8192)
+        .unwrap_err()
+        .contains("too long"));
+    // chained assignments share the budget with everything else on the line
+    let chained = |n: usize| format!("{}1", "v[0]:".repeat(n));
+    parses(chained(100));
+    // nested 127 levels deep, each opened after a long chain
+    assert_rejected(&format!(
+        "{}1",
+        ("v[0]:".to_string() + &"1+".repeat(217)).repeat(127)
+    ));
+    let level = "1+".repeat(217) + "v[";
+    assert_rejected(&format!("{}0{}", level.repeat(127), "]:1".repeat(127)));
+    // the nesting cap holds for a chain of index assignments too
+    assert!(run_child(&chained(130), 8192)
+        .unwrap_err()
+        .contains("nested too deeply"));
+}
+
 #[test]
 fn leading_minus_variant_is_rejected() {
     for (levels, terms) in [(127, 217), (32, 858)] {
@@ -373,4 +410,102 @@ fn binary_propagates_a_panic_from_the_interpreter_thread() {
     drop(stdin);
     let out = wait_timeout(child, "binary");
     assert_eq!(out.status.code(), Some(101), "{:?}", out.status);
+}
+
+/// Nesting built up one level per line is invisible to the per-line budget: it is capped by
+/// `MAX_VALUE_DEPTH` instead. Before the cap, `l=l`, `l+1` and `neg l` aborted the process with
+/// a stack overflow after tens of thousands of such lines.
+#[test]
+fn value_nesting_is_capped_across_lines() {
+    use oxidedb::types::value::MAX_VALUE_DEPTH;
+    let lines = MAX_VALUE_DEPTH + 50;
+    let mut script = String::from("l:1,2.5\n");
+    script.push_str(&"count l[0]:l\n".repeat(lines));
+    script.push_str("l=l\nl+1\nneg l\n1+99\nexit\n");
+    let mut child = Command::new(BIN)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut stdin = child.stdin.take().unwrap();
+    let feeder = std::thread::spawn(move || {
+        let _ = stdin.write_all(script.as_bytes());
+    });
+    let out = wait_timeout(child, "binary");
+    feeder.join().unwrap();
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(out.status.code(), Some(0), "{:?}: {stderr}", out.status);
+    // `l:1,2.5` is one level deep, so MAX_VALUE_DEPTH - 1 assignments fit and every later one
+    // is a `'limit`: the boundary is exact.
+    let limits = stderr.matches("'limit: nesting deeper than 64").count();
+    assert_eq!(limits, lines - (MAX_VALUE_DEPTH - 1), "{stderr}");
+    assert_eq!(stderr.matches("'limit").count(), limits);
+    // l=l, l+1 and neg l at the cap did not end the session: the last line still ran
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.lines().any(|l| l.trim() == "100"), "{stdout}");
+}
+
+/// Sharing doubles a list's logical size every round while its depth stays small: `l[0]:l` and
+/// `l[1]:l` repeated used to make `l+1`, `neg l`, display and `l,l` run for minutes. The size
+/// cap stops the rounds; everything that walks the value then finishes quickly. The child is
+/// killed by `wait_timeout` if it does not.
+#[test]
+fn shared_nesting_growth_is_capped() {
+    use oxidedb::types::value::MAX_LOGICAL_ITEMS;
+    let mut script = String::from("l:1,2.5\n");
+    script.push_str(&"l[0]:l\nl[1]:l\n".repeat(20));
+    script.push_str("l+1\nneg l\nl=l\nl,l\nl\n1+99\nexit\n");
+    let started = Instant::now();
+    let mut child = Command::new(BIN)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut stdin = child.stdin.take().unwrap();
+    let feeder = std::thread::spawn(move || {
+        let _ = stdin.write_all(script.as_bytes());
+    });
+    // the display of `l` is megabytes: drain stdout as it comes instead of buffering it
+    let stdout = child.stdout.take().unwrap();
+    let reader = std::thread::spawn(move || {
+        use std::io::BufRead;
+        std::io::BufReader::new(stdout)
+            .lines()
+            .map_while(Result::ok)
+            .any(|l| l.trim() == "100")
+    });
+    let mut stderr = child.stderr.take().unwrap();
+    let errors = std::thread::spawn(move || {
+        let mut text = String::new();
+        let _ = std::io::Read::read_to_string(&mut stderr, &mut text);
+        text
+    });
+    let deadline = Instant::now() + Duration::from_secs(60);
+    let status = loop {
+        if let Some(status) = child.try_wait().unwrap() {
+            break status;
+        }
+        if Instant::now() > deadline {
+            child.kill().unwrap();
+            panic!("binary did not finish within 60s");
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    };
+    feeder.join().unwrap();
+    let finished = reader.join().unwrap();
+    let stderr = errors.join().unwrap();
+    assert_eq!(status.code(), Some(0), "{status:?}: {stderr}");
+    // 26 of the 40 assignments fit (the library test pins the first refusal at round 13; a
+    // later `l[0]:l` can still fit by replacing a big item), 14 are over the cap, and `l,l`
+    // doubles a list that is already past half of it
+    let cap = format!("'limit: value larger than {MAX_LOGICAL_ITEMS} items");
+    assert_eq!(stderr.matches(&cap).count(), 14 + 1, "{stderr}");
+    assert!(finished, "session ended early");
+    assert!(
+        started.elapsed() < Duration::from_secs(30),
+        "took {:?}",
+        started.elapsed()
+    );
 }

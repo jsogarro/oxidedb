@@ -15,7 +15,10 @@ fn errors_display_q_style() {
         (QError::Type, "'type"),
         (QError::Length, "'length"),
         (QError::Rank, "'rank"),
-        (QError::Index, "'index"),
+        (
+            QError::Limit("nesting deeper than 64".into()),
+            "'limit: nesting deeper than 64",
+        ),
         (QError::Domain, "'domain"),
         (QError::Nyi("adverb '/'".into()), "'nyi: adverb '/'"),
         (QError::Parse("bad".into()), "'parse: bad"),
