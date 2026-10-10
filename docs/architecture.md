@@ -15,7 +15,8 @@ OxideDB is currently a small q-inspired expression interpreter (the **O** langua
 
 - `atom.rs`: the scalar `Atom` enum (boolean, long, float, character, symbol, date, time, timestamp, and typed temporal nulls) with q type codes and q-style display.
 - `sym.rs`: interned symbols, a 4-byte handle into a process-global string table. Interned names are never freed.
-- `column.rs`: `Column`, a typed vector (bool, long, float, char, symbol). It is reachable through `Value::Vector`, but the language cannot create one yet.
+- `column.rs`: `Column`, a typed vector (bool, long, float, char, symbol). It is reachable through `Value::Vector`, but the language cannot create one yet. `index` (typed gather, typed nulls for bad indices), `take` (q `#`, cyclic, negative from the end) and `concat` (same type only) are the helpers indexing, take and join build on.
+- `builtins.rs` (in `src/language/`): `lookup(name)` and `call(name, args)` for the one-argument keywords `til` (capped at 100,000,000 elements) and `count`. The interpreter does not resolve names to them yet.
 - `value.rs`: `Value`, the result of evaluation (atom, vector or general list), its equality and display.
 - `display.rs`: q-style `Display` for `Column` (`1 2 3`, `1 2 3f`, `101b`, `` `a`b ``, `"abc"`) and the character escaping shared with `Atom`'s `Display`.
 
