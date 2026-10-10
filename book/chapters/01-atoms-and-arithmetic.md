@@ -172,6 +172,14 @@ oxidedb> -x+3
 -5
 ```
 
+A minus glued to a digit is part of the number, so `-5 + 3` is `-2`; with a space, `- 5 + 3` applies the minus to `5 + 3` and gives `-8`:
+```
+oxidedb> -5 + 3
+-2
+oxidedb> - 5 + 3
+-8
+```
+
 ## Exercises
 
 Try these expressions in the REPL and verify your understanding:

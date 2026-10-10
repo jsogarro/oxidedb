@@ -11,7 +11,10 @@ pub struct Parser {
     depth: usize,
 }
 
-const MAX_DEPTH: usize = 256;
+/// Maximum nesting of parentheses / monadic minus.
+const MAX_DEPTH: usize = 128;
+/// Maximum operators in one flat chain (`1+1+...`); evaluate and drop recurse over it.
+const MAX_CHAIN: usize = 2_000;
 
 impl Parser {
     pub fn new(mut tokens: Vec<Token>) -> Self {
@@ -64,26 +67,49 @@ impl Parser {
     }
 
     fn binary_expression(&mut self) -> Result<Expr> {
-        let left = self.unary()?;
-
-        if self.match_tokens(&[Token::Plus, Token::Minus, Token::Multiply, Token::Divide]) {
-            let operator = match self.previous() {
+        // Parsed iteratively so a long flat chain does not consume parser depth;
+        // folded from the right into the same right-associative AST.
+        let mut operands = Vec::new();
+        let mut operators = Vec::new();
+        loop {
+            let mut operand = self.unary()?;
+            // An assignment in operand position (`x+y:2`) takes the rest of the input.
+            if let (false, Expr::Symbol(name)) = (operands.is_empty(), &operand) {
+                if self.match_tokens(&[Token::Colon]) {
+                    let name = name.clone();
+                    let value = self.expression()?;
+                    operand = Expr::Assignment {
+                        name,
+                        value: Box::new(value),
+                    };
+                }
+            }
+            operands.push(operand);
+            if !self.match_tokens(&[Token::Plus, Token::Minus, Token::Multiply, Token::Divide]) {
+                break;
+            }
+            operators.push(match self.previous() {
                 Token::Plus => BinaryOperator::Add,
                 Token::Minus => BinaryOperator::Subtract,
                 Token::Multiply => BinaryOperator::Multiply,
                 Token::Divide => BinaryOperator::Divide,
                 _ => unreachable!(),
-            };
-            // Right-associative: recursively parse the right side
-            let right = self.expression()?;
-            Ok(Expr::BinaryOp {
+            });
+            // The AST is still a right-nested tree, which evaluate and drop recurse over.
+            if operators.len() >= MAX_CHAIN {
+                return Err(anyhow!("expression too long"));
+            }
+        }
+        let mut right = operands.pop().expect("at least one operand");
+        while let Some(operator) = operators.pop() {
+            let left = operands.pop().expect("operand per operator");
+            right = Expr::BinaryOp {
                 left: Box::new(left),
                 operator,
                 right: Box::new(right),
-            })
-        } else {
-            Ok(left)
+            };
         }
+        Ok(right)
     }
 
     fn unary(&mut self) -> Result<Expr> {
