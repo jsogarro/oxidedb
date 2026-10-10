@@ -163,13 +163,20 @@ fn value_null_equality() {
 }
 
 #[test]
-fn value_non_atom_arithmetic_is_nyi() {
-    let nyi = || QError::Nyi("vector arithmetic".into());
+fn value_non_atom_arithmetic_evaluates() {
     let mut i = Interpreter::new();
     i.set("v", longs(&[1, 2, 3]));
     i.set("l", Value::List(Rc::new(vec![int(1)])));
-    for src in ["v+1", "1+v", "v*v", "l-1", "1%l", "-v", "-l"] {
-        assert_eq!(i.eval_line(src), Err(nyi()), "{src}");
+    for (src, want) in [
+        ("v+1", longs(&[2, 3, 4])),
+        ("1+v", longs(&[2, 3, 4])),
+        ("v*v", longs(&[1, 4, 9])),
+        ("l-1", longs(&[0])),
+        ("1%l", floats(&[1.0])),
+        ("-v", longs(&[-1, -2, -3])),
+        ("-l", longs(&[-1])),
+    ] {
+        assert_eq!(i.eval_line(src), Ok(Some(want)), "{src}");
     }
     // Bound values are still readable.
     assert_eq!(i.get("v"), Some(&longs(&[1, 2, 3])));

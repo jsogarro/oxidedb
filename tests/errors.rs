@@ -61,17 +61,10 @@ fn errors_parse_kind() {
 
 #[test]
 fn errors_type_kind() {
-    for src in [
-        "1+\"a\"",
-        "1b+1",
-        "\"a\"+\"b\"",
-        "-(1b)",
-        "-(\"a\")",
-        "1.5*1b",
-    ] {
+    for src in ["1+\"a\"", "\"a\"+\"b\"", "-(\"a\")"] {
         assert_eq!(err(src), QError::Type, "{src}");
     }
-    assert_eq!(err("1b+1").to_string(), "'type");
+    assert_eq!(err("1+\"a\"").to_string(), "'type");
 }
 
 #[test]

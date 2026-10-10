@@ -14,7 +14,7 @@ O combines the expressiveness of Q with modern language design principles:
 - **Right-to-Left Evaluation**: Natural mathematical evaluation order  
 - **Array-Oriented**: Designed for working with collections of data (collections arrive in Chapter 3; so far O handles single values)
 - **Interactive**: Immediate feedback through the REPL
-- **Strict About Types**: Combinations that make no sense are errors, not silent conversions (for example, `1b + 1`)
+- **Strict About Types**: Combinations that make no sense are errors, not silent conversions (for example, `1 + "a"`)
 
 ## The OxideDB Environment
 

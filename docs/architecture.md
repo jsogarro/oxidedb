@@ -9,8 +9,9 @@ OxideDB is currently a small q-inspired expression interpreter (the **O** langua
 - `lexer.rs`: turns a line of text into a `Vec<Token>` ending in `Token::Eof`. Handles integer and float literals, `1b`/`0b` booleans, `"c"` characters, `"abc"` strings (with `\" \\ \n \t \r` escapes), `` `a ``/`` `a`b `` symbols, `101b` boolean vectors, the comparison and punctuation tokens `= < > <> <= >= # , ! { } $ @ ' ': /: \: ::` (the parser reports these as not yet implemented), identifiers (variable names; a literal glued to another, as in `1.5.5` or `"ab""cd"`, is an invalid literal), the `0N`/`0n`/`0w` null and infinity literals, and `/` comments (a `/` at line start or after whitespace comments out the rest of the line).
 - `parser.rs`: builds an `Expr` from the tokens.
 - `ast.rs`: `Expr` (atom, symbol, binary op, unary op, assignment) the negate operator, and `Verb`, the binary verbs `+ - * % = < > <> <= >= # , !`. The parser produces only `+ - * %`; the rest are placeholders that evaluate to `'nyi`.
-- `interpreter.rs`: evaluates an `Expr` against a `HashMap<String, Value>` of variables. `Interpreter::eval_line` runs the whole pipeline for one line.
+- `interpreter.rs`: evaluates an `Expr` against a `HashMap<String, Value>` of variables. `Interpreter::eval_line` runs the whole pipeline for one line. Verbs are applied by `ops`.
 - `builtins.rs`: `lookup(name)` resolves a keyword to a `Builtin` (`name`, `arity`, `call`); `call(name, args)` wraps it. Keywords: `til` and `count`. `til` and `Column::take` share the `MAX_ELEMS` cap (10,000,000 elements, `'domain` beyond it). The interpreter does not resolve names to them yet.
+- `ops/`: verb kernels over `Value`s. `ops::dyad(verb, &l, &r)` and `ops::monad_neg(&v)` are the entry points. `ops/arith.rs` implements `+ - * %` atomically: atoms, vectors (broadcast, or pairwise with equal lengths) and general lists (item-wise, renormalised through `Value::from_items`). A boolean counts as a long, long with float is float, `%` is always float, a long null stays null (`0n` once a float is involved), and any element overflowing is `'overflow`. Symbols, characters and temporals are `'type`; a length mismatch is `'length`. Verbs without a kernel give `'nyi: <verb>`.
 
 ### `src/types/`
 
@@ -36,7 +37,7 @@ Evaluation returns a `Value` (`src/types/value.rs`): an `Atom`, a `Vector(Rc<Col
 
 Equality treats nulls as equal (`0n` equals `0n`, in atoms, columns and lists), while `0f` and `-0f` stay equal. `Value` also compares with `Atom` in both directions, so an atom result can be asserted directly. A general list prints one item per line, `()` when empty.
 
-Arithmetic is atom-only: an operand that is a vector or list gives `'nyi: vector arithmetic`. The parser produces the `Verb`s `+ - * %`; `= < > <> <= >= # , !` exist in the AST and give `'nyi: <verb>` until implemented.
+Arithmetic is atomic: `+ - * %` and unary minus extend over vectors and lists (see `ops/arith.rs` above), though the language cannot build a vector yet, so this is reachable only through `Interpreter::set` and the library API. The parser produces the `Verb`s `+ - * %`; `= < > <> <= >= # , !` exist in the AST and give `'nyi: <verb>` until implemented.
 
 Symbol, date, time and timestamp atoms exist as types, but the language has no literal for them yet. Long, float, character and symbol nulls are sentinels, not separate variants: `Integer(i64::MIN)`, `Float(NaN)`, `Character(' ')`, `Symbol(Sym::NULL)`. Producing `i64::MIN` by arithmetic is reported as overflow. Only the temporal nulls have their own variants. Variables live in the interpreter's map for the length of the session and are not saved.
 
@@ -57,7 +58,7 @@ There are no `#[cfg(test)]` modules in `src/`.
 
 Not implemented; nothing here is partially present.
 
-- Vector and list literals, indexing and vector arithmetic (the `Value` type exists; the language cannot yet build one).
+- Vector and list literals and indexing (the `Value` type exists; the language cannot yet build one).
 - Dictionaries and tables, and queries over them.
 - Functions, conditionals and adverbs.
 - Persistence of variables and tables.
