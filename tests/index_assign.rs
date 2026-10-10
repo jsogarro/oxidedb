@@ -769,3 +769,125 @@ fn amend_rejects_an_atom_target_itself() {
     }
     assert_eq!(x, long(5));
 }
+
+// ---- logical size cap ----
+
+use oxidedb::types::value::MAX_LOGICAL_ITEMS as CAP;
+
+/// `d` doublings of `(1;2.5)` by sharing: 60 distinct lists, 2^60 paths.
+fn doubled(d: usize) -> Value {
+    let mut v = nested(1);
+    for _ in 0..d {
+        v = Value::List(Rc::new(vec![v.clone(), v]));
+    }
+    v
+}
+
+#[test]
+fn logical_size_counts_every_path_in_linear_time() {
+    assert_eq!(long(1).logical_size(), 1);
+    assert_eq!(longs(&[1, 2, 3]).logical_size(), 3);
+    // an empty vector still occupies a slot
+    assert_eq!(longs(&[]).logical_size(), 1);
+    // a list is its slots plus its items: (1;2.5) is 3
+    assert_eq!(nested(1).logical_size(), 3);
+    assert_eq!(nested(2).logical_size(), 5);
+    // 40 doublings: 2^40 paths, answered from 40 distinct lists. size(d) = 4 * 2^d - 1
+    assert_eq!(doubled(40).logical_size(), 4 * (1u64 << 40) - 1);
+    // far more paths than a u64 holds: saturates instead of wrapping
+    let a = nested(1);
+    let mut v = a;
+    for _ in 0..50 {
+        v = Value::List(Rc::new(vec![v.clone(), v.clone(), v]));
+    }
+    assert_eq!(v.logical_size(), u64::MAX);
+    // 100 levels of sharing is past the depth bound along every one of 2^100 paths: the first
+    // cut-off ends the walk instead of repeating it per path
+    assert_eq!(doubled(100).logical_size(), u64::MAX);
+    assert!(doubled(100).check_nesting(0).is_err());
+    // deeper than any recursion could follow: saturates without recursing
+    let deep = nested(100_000);
+    assert_eq!(deep.logical_size(), u64::MAX);
+    std::mem::forget(deep);
+}
+
+#[test]
+fn check_nesting_enforces_both_limits_with_injected_caps() {
+    // (1;2.5) has logical size 3
+    let v = nested(1);
+    assert!(
+        v.check_nesting_within(0, 64, 3).is_ok(),
+        "exactly at the cap"
+    );
+    assert_eq!(
+        v.check_nesting_within(0, 64, 2),
+        Err(QError::Limit("value larger than 2 items".into()))
+    );
+    // the depth limit has its own boundary
+    assert!(nested(4).check_nesting_within(0, 4, 100).is_ok());
+    assert_eq!(
+        nested(5).check_nesting_within(0, 4, 100),
+        Err(QError::Limit("nesting deeper than 4".into()))
+    );
+    // a shared shape is rejected from its distinct lists alone
+    let e = doubled(40).check_nesting(0).unwrap_err();
+    assert_eq!(
+        e.to_string(),
+        format!("'limit: value larger than {CAP} items")
+    );
+}
+
+#[test]
+fn iassign_logical_size_boundary() {
+    // l = (0; A) with A a vector of 5,000,000: size 1 + 1 + 5,000,000
+    let big = longs(&vec![0; 500_000]);
+    let mut i = Interpreter::new();
+    i.set("l", Value::List(Rc::new(vec![long(0), big])));
+    // replacing the atom by a vector of k items makes the size 1 + k + 5,000,000
+    i.set("ok", longs(&vec![0; CAP - 500_001]));
+    i.eval_line("l[0]:ok").unwrap();
+    i.set("over", longs(&vec![0; CAP - 500_000]));
+    let before = i.get("l").cloned().unwrap();
+    let Err(e) = i.eval_line("l[0]:over") else {
+        panic!("a value over the cap was accepted")
+    };
+    assert_eq!(
+        e.to_string(),
+        format!("'limit: value larger than {CAP} items")
+    );
+    assert_eq!(i.get("l"), Some(&before));
+    // the replaced item's size is credited: swapping a big item for an equal one is fine
+    i.eval_line("l[0]:ok").unwrap();
+    // atoms never grow a list, so they are accepted at the cap too
+    i.eval_line("l[0]:5").unwrap();
+    // a duplicate position counts the last value only
+    i.set(
+        "l",
+        Value::List(Rc::new(vec![long(0), longs(&vec![0; 500_000])])),
+    );
+    i.set(
+        "pair",
+        Value::List(Rc::new(vec![
+            i.get("over").cloned().unwrap(),
+            i.get("ok").cloned().unwrap(),
+        ])),
+    );
+    i.eval_line("l[0 0]:pair").unwrap();
+    // doubling by sharing stops at the cap, after a bounded number of rounds
+    let mut j = Interpreter::new();
+    j.eval_line("l:1,2.5").unwrap();
+    let mut rounds = 0;
+    loop {
+        assert!(rounds < 40, "doubling never hit the cap");
+        let first = j.eval_line("l[0]:l");
+        let second = j.eval_line("l[1]:l");
+        if first.is_err() || second.is_err() {
+            assert!(matches!(first.and(second), Err(QError::Limit(_))));
+            break;
+        }
+        rounds += 1;
+    }
+    // each round roughly triples the size: 12 rounds fit under 1,000,000, the 13th does not
+    assert_eq!(rounds, 12);
+    assert!(j.get("l").unwrap().logical_size() <= CAP as u64);
+}

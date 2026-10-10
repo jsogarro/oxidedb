@@ -445,3 +445,67 @@ fn value_nesting_is_capped_across_lines() {
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(stdout.lines().any(|l| l.trim() == "100"), "{stdout}");
 }
+
+/// Sharing doubles a list's logical size every round while its depth stays small: `l[0]:l` and
+/// `l[1]:l` repeated used to make `l+1`, `neg l`, display and `l,l` run for minutes. The size
+/// cap stops the rounds; everything that walks the value then finishes quickly. The child is
+/// killed by `wait_timeout` if it does not.
+#[test]
+fn shared_nesting_growth_is_capped() {
+    use oxidedb::types::value::MAX_LOGICAL_ITEMS;
+    let mut script = String::from("l:1,2.5\n");
+    script.push_str(&"l[0]:l\nl[1]:l\n".repeat(20));
+    script.push_str("l+1\nneg l\nl=l\nl,l\nl\n1+99\nexit\n");
+    let started = Instant::now();
+    let mut child = Command::new(BIN)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut stdin = child.stdin.take().unwrap();
+    let feeder = std::thread::spawn(move || {
+        let _ = stdin.write_all(script.as_bytes());
+    });
+    // the display of `l` is megabytes: drain stdout as it comes instead of buffering it
+    let stdout = child.stdout.take().unwrap();
+    let reader = std::thread::spawn(move || {
+        use std::io::BufRead;
+        std::io::BufReader::new(stdout)
+            .lines()
+            .map_while(Result::ok)
+            .any(|l| l.trim() == "100")
+    });
+    let mut stderr = child.stderr.take().unwrap();
+    let errors = std::thread::spawn(move || {
+        let mut text = String::new();
+        let _ = std::io::Read::read_to_string(&mut stderr, &mut text);
+        text
+    });
+    let deadline = Instant::now() + Duration::from_secs(60);
+    let status = loop {
+        if let Some(status) = child.try_wait().unwrap() {
+            break status;
+        }
+        if Instant::now() > deadline {
+            child.kill().unwrap();
+            panic!("binary did not finish within 60s");
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    };
+    feeder.join().unwrap();
+    let finished = reader.join().unwrap();
+    let stderr = errors.join().unwrap();
+    assert_eq!(status.code(), Some(0), "{status:?}: {stderr}");
+    // 26 of the 40 assignments fit (the library test pins the first refusal at round 13; a
+    // later `l[0]:l` can still fit by replacing a big item), 14 are over the cap, and `l,l`
+    // doubles a list that is already past half of it
+    let cap = format!("'limit: value larger than {MAX_LOGICAL_ITEMS} items");
+    assert_eq!(stderr.matches(&cap).count(), 14 + 1, "{stderr}");
+    assert!(finished, "session ended early");
+    assert!(
+        started.elapsed() < Duration::from_secs(30),
+        "took {:?}",
+        started.elapsed()
+    );
+}

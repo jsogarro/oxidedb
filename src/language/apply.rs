@@ -6,6 +6,7 @@ use crate::error::{QError, QResult};
 use crate::types::atom::Atom;
 use crate::types::column::Column;
 use crate::types::value::Value;
+use crate::types::value::{Sizer, MAX_LOGICAL_ITEMS, MAX_VALUE_DEPTH};
 use std::rc::Rc;
 
 /// `f[args]`. No arguments gives `f` back; a vector takes one index.
@@ -145,6 +146,33 @@ pub fn amend(target: &mut Value, idx: &Value, val: &Value) -> QResult<()> {
             };
             // O(size of what goes in): shared lists are visited once
             new.iter().try_for_each(|x| x.check_nesting(1))?;
+            // The list's size after the change: what it holds now, minus the items replaced
+            // (the last value written to a position wins), plus the items that replace them.
+            // An atom is the smallest item (size 1), so replacing items by atoms cannot grow
+            // the list, and that common case skips the walk. Sharing is memoised: linear in
+            // the distinct lists, never in the paths.
+            if new.iter().any(|x| !matches!(x, Value::Atom(_))) {
+                let mut sizer = Sizer::default();
+                let room = MAX_VALUE_DEPTH;
+                let mut last = std::collections::HashMap::new();
+                for (k, &p) in pos.iter().enumerate() {
+                    last.insert(p, if new.len() == 1 { 0 } else { k });
+                }
+                let mut total = items
+                    .iter()
+                    .fold(1u64, |n, x| n.saturating_add(sizer.size(x, room)));
+                if total != u64::MAX {
+                    for (&p, &k) in &last {
+                        total -= sizer.size(&items[p], room);
+                        total = total.saturating_add(sizer.size(&new[k], room));
+                    }
+                }
+                if total > MAX_LOGICAL_ITEMS as u64 {
+                    return Err(QError::Limit(format!(
+                        "value larger than {MAX_LOGICAL_ITEMS} items"
+                    )));
+                }
+            }
             let list = Rc::make_mut(items);
             for (k, &p) in pos.iter().enumerate() {
                 list[p] = if new.len() == 1 {
