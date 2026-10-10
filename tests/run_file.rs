@@ -35,8 +35,11 @@ fn run_file_reports_error_once_and_fails() {
     let out = run("err", b"1+2\n1 +\n9\n");
     assert_eq!(out.status.code(), Some(1));
     let stderr = String::from_utf8_lossy(&out.stderr);
-    assert_eq!(stderr.matches("Error").count(), 1, "stderr: {stderr}");
-    assert!(stderr.contains("line 2"), "stderr: {stderr}");
+    assert_eq!(stderr.matches("'parse").count(), 1, "stderr: {stderr}");
+    assert!(
+        stderr.contains("line 2: 'parse: unexpected end of input"),
+        "stderr: {stderr}"
+    );
     assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "3");
 }
 
@@ -92,8 +95,8 @@ fn repl_errors_go_to_stderr_results_to_stdout() {
         String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr),
     );
-    assert!(e.contains("Error"), "stderr: {e}");
-    assert!(!o.contains("Error"), "stdout: {o}");
+    assert!(e.contains("'parse"), "stderr: {e}");
+    assert!(!o.contains("'parse"), "stdout: {o}");
     assert!(o.contains('5'), "stdout: {o}");
     // Two banner lines, then only the result: the comment-only line prints nothing.
     let shown = o.replace("oxidedb> ", "");

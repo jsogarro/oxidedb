@@ -65,10 +65,10 @@ fn exponent_in_expressions() {
 
 #[test]
 fn out_of_range_float_is_error() {
-    assert!(lex_err("1e999").contains("Float out of range"));
-    assert!(lex_err("-1e999").contains("Float out of range"));
+    assert!(lex_err("1e999").contains("float out of range"));
+    assert!(lex_err("-1e999").contains("float out of range"));
     let big = format!("{}.0", "9".repeat(400));
-    assert!(lex_err(&big).contains("Float out of range"));
+    assert!(lex_err(&big).contains("float out of range"));
     assert_eq!(show("1.7e308"), "1.7e+308");
 }
 
@@ -125,14 +125,14 @@ fn infinity_arithmetic() {
 
 #[test]
 fn long_infinity_is_clean_error() {
-    assert!(lex_err("0W").contains("not supported"));
-    assert!(lex_err("-0W").contains("not supported"));
+    assert!(lex_err("0W").contains("0W (long infinity)"));
+    assert!(lex_err("-0W").contains("0W (long infinity)"));
 }
 
 #[test]
 fn malformed_null_literals_are_errors() {
     for src in ["0Nd", "0nx", "0wx", "0Nx", "0N_", "0n1"] {
-        assert!(lex_err(src).contains("Invalid literal"), "{src}");
+        assert!(lex_err(src).contains("invalid literal"), "{src}");
     }
 }
 

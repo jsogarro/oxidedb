@@ -6,7 +6,7 @@ const N: usize = 200_000;
 fn run(interp: &mut Interpreter, src: &str) -> anyhow::Result<Atom> {
     let tokens = Lexer::new(src).tokenize()?;
     let ast = Parser::new(tokens).parse()?;
-    interp.evaluate(ast)
+    Ok(interp.evaluate(ast)?)
 }
 
 fn eval(src: &str) -> anyhow::Result<Atom> {

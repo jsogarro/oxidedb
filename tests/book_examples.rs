@@ -10,12 +10,13 @@ const PROMPT: &str = "oxidedb> ";
 const MARKER: &str = "// Expected output: ";
 
 /// Evaluate one line the way the binary does: comment-only and blank lines
-/// print nothing (empty string), errors print as `Error: <message>`.
+/// print nothing (empty string), errors print as the q-style error text, which
+/// always starts with a quote (`'type`); no atom prints that way.
 fn run_line(interp: &mut Interpreter, input: &str) -> Option<String> {
     match interp.eval_line(input) {
         Ok(Some(atom)) => Some(format!("{}", atom)),
         Ok(None) => None,
-        Err(e) => Some(format!("Error: {}", e)),
+        Err(e) => Some(e.to_string()),
     }
 }
 
@@ -59,7 +60,7 @@ fn check_o_file(name: &str, text: &str) -> Vec<String> {
                     ));
                 }
             }
-            None if actual.starts_with("Error: ") => {
+            None if actual.starts_with('\'') => {
                 problems.push(format!(
                     "{}:{}: `{}` failed unexpectedly: {}",
                     name, n, line, actual
@@ -359,5 +360,18 @@ fn checker_reports_wrong_and_missing_expectations() {
     assert!(reports(
         &check_chapter("f.md", "no samples\n"),
         "no checked"
+    ));
+}
+
+#[test]
+fn checker_errors_are_q_style() {
+    let md = "```\noxidedb> 1b + 1\n'type\noxidedb> nope\n'nope (Undefined variable)\n```\n";
+    assert_eq!(check_chapter("f.md", md), Vec::<String>::new());
+    let stale = "```\noxidedb> 1b + 1\nError: Invalid binary operation\n```\n";
+    assert!(reports(&check_chapter("f.md", stale), "actual:   'type"));
+    // an error with no expectation is a problem
+    assert!(reports(
+        &check_o_file("f.o", "// Expected output: 1\n1\n1b + 1\n"),
+        "failed unexpectedly: 'type"
     ));
 }

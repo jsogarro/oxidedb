@@ -25,7 +25,7 @@ The O interpreter will:
 - Skip comment-only and empty lines
 - Execute each O expression line by line
 - Display the result of each expression
-- Stop at the first error: it is reported once on stderr (with the line number) and the exit status is 1
+- Stop at the first error: it is reported once on stderr (q style, with the line number: `line 3: 'type`) and the exit status is 1
 - Write the banner to stderr, so stdout contains only results (and a leading UTF-8 BOM is ignored)
 
 ## Example Output

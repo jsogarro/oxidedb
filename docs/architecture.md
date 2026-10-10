@@ -34,7 +34,7 @@ Every result is an `Atom`. Symbol, date, time and timestamp atoms exist as types
 
 ## Error handling
 
-Lexing, parsing and evaluation return `anyhow::Result`. The REPL prints `Error: <message>` and keeps the session; `run_file` stops at the first failing line and reports its line number. Arithmetic overflow, undefined variables, unsupported operand types and the parser limits above are ordinary errors.
+Lexing, parsing and evaluation return `Result<_, QError>` (`src/error.rs`). `QError` is a q-style error whose text is a quote and a short name: `'type`, `'overflow`, `'parse: <detail>`, `'<name> (Undefined variable)`, `'nyi: <detail>`; `length`, `rank`, `index`, `domain`, `stack` and `signal` are defined for later features. Malformed input and the limits above are `Parse`, features O does not have yet (`0W`, adverbs, strings, symbols) are `Nyi`, unsupported operand types are `Type`, and integer overflow is `Overflow`. Tokens appear in messages in source form (`'parse: unexpected -1 after expression`). The REPL prints the error text on stderr and keeps the session; `run_file` stops at the first failing line and prints the error once with its line number (`line 3: 'type`); the `QError` stays the source of the returned `anyhow` error, and the process exits with status 1.
 
 ## Testing
 

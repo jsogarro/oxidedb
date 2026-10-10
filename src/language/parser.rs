@@ -1,12 +1,12 @@
+use crate::error::{QError, QResult};
 use crate::language::{
     ast::{BinaryOperator, Expr, UnaryOperator},
     lexer::Token,
 };
 use crate::types::atom::Atom;
-use anyhow::{anyhow, Result};
 
-fn adverb_nyi(token: &Token) -> anyhow::Error {
-    anyhow!("adverb '{}' not yet implemented", token)
+fn adverb_nyi(token: &Token) -> QError {
+    QError::Nyi(format!("adverb '{}'", token))
 }
 
 pub struct Parser {
@@ -32,23 +32,23 @@ impl Parser {
         }
     }
 
-    pub fn parse(&mut self) -> Result<Expr> {
+    pub fn parse(&mut self) -> QResult<Expr> {
         let expr = self.expression()?;
         if !self.is_at_end() {
             if matches!(self.peek(), Token::Over | Token::Scan) {
                 return Err(adverb_nyi(self.peek()));
             }
-            return Err(anyhow!(
-                "Unexpected token after expression: {:?}",
+            return Err(QError::parse(format!(
+                "unexpected {} after expression",
                 self.peek()
-            ));
+            )));
         }
         Ok(expr)
     }
 
-    fn expression(&mut self) -> Result<Expr> {
+    fn expression(&mut self) -> QResult<Expr> {
         if self.depth >= MAX_DEPTH {
-            return Err(anyhow!("expression nested too deeply"));
+            return Err(QError::parse("expression nested too deeply"));
         }
         self.depth += 1;
         let result = self.assignment();
@@ -56,7 +56,7 @@ impl Parser {
         result
     }
 
-    fn assignment(&mut self) -> Result<Expr> {
+    fn assignment(&mut self) -> QResult<Expr> {
         let expr = self.binary_expression()?;
 
         // Check if this is an assignment (symbol followed by colon)
@@ -73,7 +73,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn binary_expression(&mut self) -> Result<Expr> {
+    fn binary_expression(&mut self) -> QResult<Expr> {
         // Parsed iteratively so a long flat chain does not consume parser depth;
         // folded from the right into the same right-associative AST.
         let mut operands = Vec::new();
@@ -104,7 +104,7 @@ impl Parser {
             });
             // The AST is still a right-nested tree, which evaluate and drop recurse over.
             if operators.len() >= MAX_CHAIN {
-                return Err(anyhow!("expression too long"));
+                return Err(QError::parse("expression too long"));
             }
         }
         let mut right = operands.pop().expect("at least one operand");
@@ -119,7 +119,7 @@ impl Parser {
         Ok(right)
     }
 
-    fn unary(&mut self) -> Result<Expr> {
+    fn unary(&mut self) -> QResult<Expr> {
         if self.match_tokens(&[Token::Minus]) {
             // Monadic minus takes its whole right side, as in q: -x+3 is -(x+3).
             let expr = self.expression()?;
@@ -132,9 +132,9 @@ impl Parser {
         self.primary()
     }
 
-    fn primary(&mut self) -> Result<Expr> {
+    fn primary(&mut self) -> QResult<Expr> {
         if self.is_at_end() {
-            return Err(anyhow!("Unexpected end of input"));
+            return Err(QError::parse("unexpected end of input"));
         }
         match self.advance() {
             Token::Integer(n) => Ok(Expr::Atom(Atom::Integer(*n))),
@@ -145,12 +145,12 @@ impl Parser {
             Token::LeftParen => {
                 let expr = self.expression()?;
                 if !self.match_tokens(&[Token::RightParen]) {
-                    return Err(anyhow!("Expected ')' after expression"));
+                    return Err(QError::parse("expected ')' after expression"));
                 }
                 Ok(expr)
             }
             token @ (Token::Over | Token::Scan) => Err(adverb_nyi(token)),
-            token => Err(anyhow!("Unexpected token: {:?}", token)),
+            token => Err(QError::parse(format!("unexpected {}", token))),
         }
     }
 

@@ -95,7 +95,7 @@ fn comment_glued_slash_is_not_comment() {
 fn glued_adverbs_are_not_yet_implemented() {
     for src in ["1/2", "1\\2", "1+/2", "1+\\2", "(1)/"] {
         let msg = parse_err(src);
-        assert!(msg.contains("not yet implemented"), "{src}: {msg}");
+        assert!(msg.starts_with("'nyi: adverb"), "{src}: {msg}");
     }
 }
 
@@ -126,6 +126,7 @@ fn repl_backslash_exit_still_works() {
         .env("HOME", &home)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .spawn()
         .unwrap();
     child
@@ -138,6 +139,11 @@ fn repl_backslash_exit_still_works() {
     std::fs::remove_dir_all(&home).ok();
     let text = String::from_utf8_lossy(&out.stdout);
     assert!(text.contains("Goodbye!"), "{text}");
-    assert!(!text.contains("Error"), "{text}");
+    // errors print as q-style lines starting with a quote
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.lines().all(|l| !l.starts_with('\'')),
+        "stderr: {stderr}"
+    );
     assert!(text.contains('3'), "{text}");
 }
