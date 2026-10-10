@@ -5,6 +5,10 @@ use crate::language::{
 use crate::types::atom::Atom;
 use anyhow::{anyhow, Result};
 
+fn adverb_nyi(token: &Token) -> anyhow::Error {
+    anyhow!("adverb '{}' not yet implemented", token)
+}
+
 pub struct Parser {
     tokens: Vec<Token>,
     current: usize,
@@ -18,6 +22,9 @@ impl Parser {
     pub fn parse(&mut self) -> Result<Expr> {
         let expr = self.expression()?;
         if !self.is_at_end() {
+            if matches!(self.peek(), Token::Over | Token::Scan) {
+                return Err(adverb_nyi(self.peek()));
+            }
             return Err(anyhow!(
                 "Unexpected token after expression: {:?}",
                 self.peek()
@@ -99,6 +106,7 @@ impl Parser {
                 }
                 Ok(expr)
             }
+            token @ (Token::Over | Token::Scan) => Err(adverb_nyi(token)),
             token => Err(anyhow!("Unexpected token: {:?}", token)),
         }
     }

@@ -50,7 +50,7 @@ oxidedb> 2 + 3
 
 - **Code blocks** show O expressions you can type in the REPL
 - **Results** are shown immediately after the expression
-- **Comments** use `//` and explain what's happening
+- **Comments** start with `/` at the beginning of a line or after a space (`//` works too) and run to the end of the line; they explain what's happening
 - **Exercises** appear at the end of each chapter
 
 ## Key Concepts

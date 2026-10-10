@@ -18,12 +18,14 @@ oxidedb> 0
 ```
 
 ### Floating Point Numbers
-Numbers with decimal places:
+Numbers with decimal places (the leading zero is optional, so `.5` is `0.5`):
 ```
 oxidedb> 3.14159
 3.14159
 oxidedb> -2.5
 -2.5
+oxidedb> .5
+0.5
 oxidedb> 0.0
 0f
 ```
