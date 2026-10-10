@@ -130,6 +130,35 @@ oxidedb> r
 1
 ```
 
+## Several Statements on a Line
+
+A semicolon between two expressions makes them separate **statements** on one line. They run from left to right (each statement is still evaluated right to left inside), and the line's value is the value of the last one:
+```
+oxidedb> apples:5;apples-1
+4
+oxidedb> apples
+5
+oxidedb> total:0;total:total+10;total:total*2;total
+20
+```
+A semicolon at the end of the line means "run it, and print nothing". That is the way to store a value without seeing it echoed. Empty statements, as in `1;;2`, are skipped:
+```
+oxidedb> pears:3;
+oxidedb> pears
+3
+oxidedb> apples:1;;pears:2;apples+pears
+3
+```
+If a statement fails, the rest of the line is not run, but what the earlier statements did stays done:
+```
+oxidedb> misses:0;
+oxidedb> hits:1;nope;hits:2
+'nope (Undefined variable)
+oxidedb> hits
+1
+```
+A semicolon inside parentheses or square brackets is not a statement separator: there it separates the items of a list or the arguments of a call (see Chapter 3).
+
 ## Variables Persist
 
 In the REPL, variables persist until you exit the session:
@@ -197,6 +226,7 @@ oxidedb> undefined_variable
 2. Calculate the area of a rectangle using width and height variables
 3. Create a temperature in Celsius and convert it to Fahrenheit using the formula: `F = 32 + (C * 9) % 5` (remember right-to-left evaluation; the result is a float, e.g. `77f` for 25)
 4. Try reassigning a variable and verify the new value
+5. Store the width and height of a rectangle and print its area in one line. Then run the same line with a `;` at the end: what is printed?
 
 ## Key Takeaways
 
@@ -207,6 +237,7 @@ oxidedb> undefined_variable
 - Right-to-left evaluation applies to expressions with variables
 - Variables persist throughout the REPL session
 - O handles type conversions automatically
+- `a;b` runs two statements left to right and gives the last value; a trailing `;` prints nothing; an error stops the line but keeps earlier effects
 - Undefined variables produce errors
 
 In the next chapter, we'll explore vectors: lists of values that you type and store as one unit.

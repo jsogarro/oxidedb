@@ -34,7 +34,10 @@ impl Interpreter {
             return Ok(None);
         }
         let ast = Parser::new(tokens).parse()?;
-        self.evaluate(ast).map(Some)
+        // a trailing `;` runs the line and prints nothing
+        let silent = matches!(ast, Expr::Sequence { silent: true, .. });
+        let value = self.evaluate(ast)?;
+        Ok((!silent).then_some(value))
     }
 
     /// Bind `name` to `value`, as `name:value` would.
@@ -73,6 +76,13 @@ impl Interpreter {
                 match operator {
                     UnaryOperator::Negate => ops::monad_neg(&val),
                 }
+            }
+            Expr::Sequence { statements, .. } => {
+                let mut last = Value::List(Default::default());
+                for statement in statements {
+                    last = self.evaluate(statement)?;
+                }
+                Ok(last)
             }
             Expr::List(items) => {
                 // right to left, like every other construct
