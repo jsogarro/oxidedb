@@ -51,6 +51,7 @@ oxidedb> 2 + 3
 - **Code blocks** show O expressions you can type in the REPL
 - **Results** are shown immediately after the expression
 - **Comments** start with `/` at the beginning of a line or after a space (`//` works too) and run to the end of the line; they explain what's happening
+- **Script files** (`cargo run -- file.o`) follow q's file rules, starting in column 0: a line holding only `/` begins a block comment and a line holding only `\` ends it (blocks nest, an unclosed one runs to the end of the file, and the lines inside are skipped without being read); a line holding only `\\`, or a `\` outside any block, ends the script successfully and skips the rest. These rules are for files only: the REPL treats a lone `/` as an ordinary comment. They cannot be shown as REPL transcripts, so they are checked by `tests/scripts.rs`, which runs the binary on script files
 - **Exercises** appear at the end of each chapter
 
 ## Key Concepts
