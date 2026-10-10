@@ -1,5 +1,3 @@
 pub mod atom;
-pub mod dictionary;
+pub mod column;
 pub mod sym;
-pub mod table;
-pub mod vector;
