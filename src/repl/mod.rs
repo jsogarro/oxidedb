@@ -1,6 +1,6 @@
-use crate::error::QError;
+use crate::error::QResult;
 use crate::language::interpreter::Interpreter;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use rustyline::{error::ReadlineError, DefaultEditor};
 use std::io::IsTerminal;
 use std::{fs, path::PathBuf};
@@ -73,11 +73,12 @@ impl Repl {
         Ok(())
     }
 
-    /// Runs a file; the first failing line aborts with an error naming the line
-    /// (`'type (line 3)`).
-    /// The caller reports the error (once).
+    /// Runs a file; the first failing line aborts with an error that wraps the
+    /// `QError` in a `line N` context (printed as `line 3: 'type`, and
+    /// recoverable with `downcast_ref::<QError>()`). The caller reports it once.
     pub fn run_file(&mut self, filename: &str) -> Result<()> {
-        let content = fs::read_to_string(filename)?;
+        let content =
+            fs::read_to_string(filename).with_context(|| format!("cannot read {filename}"))?;
         let content = content.strip_prefix('\u{feff}').unwrap_or(&content);
 
         for (line_num, line) in content.lines().enumerate() {
@@ -88,7 +89,7 @@ impl Repl {
 
             let result = self
                 .eval_line(line)
-                .map_err(|e| anyhow::anyhow!("{} (line {})", e, line_num + 1))?;
+                .map_err(|e| anyhow::Error::new(e).context(format!("line {}", line_num + 1)))?;
             if let Some(result) = result {
                 println!("{}", result);
             }
@@ -98,7 +99,7 @@ impl Repl {
     }
 
     /// Evaluates one line; `None` for input with no tokens (e.g. a comment).
-    pub fn eval_line(&mut self, input: &str) -> Result<Option<String>, QError> {
+    pub fn eval_line(&mut self, input: &str) -> QResult<Option<String>> {
         Ok(self.interpreter.eval_line(input)?.map(|a| a.to_string()))
     }
 }

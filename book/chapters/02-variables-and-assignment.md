@@ -42,7 +42,7 @@ oxidedb> x1:100
 A leading underscore is rejected:
 ```
 oxidedb> _a:1
-'parse: Invalid identifier: a name must start with a letter, not '_'
+'parse: invalid identifier: a name must start with a letter, not '_'
 ```
 
 A name that starts with a digit is an error: `1x:2` is read as the number `1` followed by a stray name.
@@ -140,7 +140,12 @@ oxidedb> initial
 "A"
 ```
 
-Strings such as `"Alice"` are not implemented yet. A double-quoted value holds exactly one character, so `name:"Alice"` is an error today. Strings arrive in a later chapter.
+Strings such as `"Alice"` are not implemented yet. A double-quoted value holds exactly one character, so `name:"Alice"` is an error today:
+```
+oxidedb> name:"Alice"
+'nyi: strings (a character literal holds exactly one character)
+```
+Strings arrive in a later chapter.
 
 ## Working with Different Types
 

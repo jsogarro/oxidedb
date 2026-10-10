@@ -1,14 +1,6 @@
-use crate::error::QError;
+use crate::error::{QError, QResult};
 use crate::types::atom::Atom;
 use std::fmt;
-
-type Result<T> = std::result::Result<T, QError>;
-
-macro_rules! perr {
-    ($($arg:tt)*) => {
-        QError::Parse(format!($($arg)*))
-    };
-}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
@@ -72,9 +64,9 @@ impl fmt::Display for Token {
 
 fn bad_identifier_char(ch: char) -> QError {
     if ch == '_' {
-        perr!("Invalid identifier: a name must start with a letter, not '_'")
+        QError::parse("invalid identifier: a name must start with a letter, not '_'")
     } else {
-        perr!("Invalid identifier: non-ASCII character '{ch}'; names are ASCII letters, digits and '_'")
+        QError::parse(format!("invalid identifier: non-ASCII character '{ch}'; names are ASCII letters, digits and '_'"))
     }
 }
 
@@ -100,7 +92,7 @@ impl Lexer {
         }
     }
 
-    pub fn tokenize(&mut self) -> Result<Vec<Token>> {
+    pub fn tokenize(&mut self) -> QResult<Vec<Token>> {
         let mut tokens = Vec::new();
 
         loop {
@@ -116,7 +108,7 @@ impl Lexer {
         Ok(tokens)
     }
 
-    fn next_token(&mut self, prev: Option<&Token>) -> Result<Token> {
+    fn next_token(&mut self, prev: Option<&Token>) -> QResult<Token> {
         self.skip_whitespace();
 
         match self.current_char {
@@ -178,7 +170,8 @@ impl Lexer {
                 ch if ch.is_ascii_digit() => self.read_number(),
                 ch if ch.is_ascii_alphabetic() => self.read_identifier(),
                 ch if ch.is_alphanumeric() || ch == '_' => Err(bad_identifier_char(ch)),
-                _ => Err(perr!("Unexpected character: {}", ch)),
+                '`' => Err(QError::Nyi("symbols".into())),
+                _ => Err(QError::parse(format!("unexpected character: {ch}"))),
             },
         }
     }
@@ -246,7 +239,7 @@ impl Lexer {
         }
     }
 
-    fn read_number(&mut self) -> Result<Token> {
+    fn read_number(&mut self) -> QResult<Token> {
         let mut number = String::new();
         let mut is_float = false;
 
@@ -287,16 +280,16 @@ impl Lexer {
                 } else {
                     f64::INFINITY
                 })),
-                Some('W') => return Err(QError::Nyi("Long infinity 0W is not supported".into())),
+                Some('W') => return Err(QError::Nyi("0W (long infinity)".into())),
                 _ => None,
             };
             if let Some(token) = literal {
                 if self.ident_char_at(1) {
-                    return Err(perr!(
-                        "Invalid literal: {}{}...",
+                    return Err(QError::parse(format!(
+                        "invalid literal: {}{}...",
                         number,
                         self.current_char.unwrap_or(' ')
-                    ));
+                    )));
                 }
                 self.advance();
                 return Ok(token);
@@ -312,7 +305,9 @@ impl Lexer {
                 self.advance();
             }
             if !self.current_char.is_some_and(|c| c.is_ascii_digit()) {
-                return Err(perr!("Invalid float: exponent needs digits after 'e'"));
+                return Err(QError::parse(
+                    "invalid float: exponent needs digits after 'e'",
+                ));
             }
             while let Some(ch) = self.current_char.filter(char::is_ascii_digit) {
                 number.push(ch);
@@ -328,22 +323,22 @@ impl Lexer {
         if is_float {
             let value = number
                 .parse::<f64>()
-                .map_err(|_| perr!("Invalid float: {}", number))?;
+                .map_err(|_| QError::parse(format!("invalid float: {number}")))?;
             if !value.is_finite() {
-                return Err(perr!("Float out of range: {}", number));
+                return Err(QError::parse(format!("float out of range: {number}")));
             }
             Ok(Token::Float(value))
         } else {
             let value = number
                 .parse::<i64>()
-                .map_err(|_| perr!("Invalid integer: {}", number))?;
+                .map_err(|_| QError::parse(format!("invalid integer: {number}")))?;
             Ok(Token::Integer(value))
         }
     }
 
     /// Called only on an ASCII letter: consumes it unconditionally, so this can
     /// never return without advancing.
-    fn read_identifier(&mut self) -> Result<Token> {
+    fn read_identifier(&mut self) -> QResult<Token> {
         let mut identifier = String::new();
         while let Some(ch) = self.current_char {
             if identifier.is_empty() || is_ident_char(ch) {
@@ -356,19 +351,26 @@ impl Lexer {
         Ok(Token::Symbol(identifier))
     }
 
-    fn read_character(&mut self) -> Result<Token> {
+    fn read_character(&mut self) -> QResult<Token> {
         self.advance(); // Skip opening quote
 
-        let ch = self
-            .current_char
-            .ok_or_else(|| perr!("Unterminated character literal"))?;
+        let unterminated = || QError::parse("unterminated character literal");
+        let ch = self.current_char.ok_or_else(unterminated)?;
         self.advance();
 
         if self.current_char == Some('"') {
             self.advance(); // Skip closing quote
-            Ok(Token::Character(ch))
+            return Ok(Token::Character(ch));
+        }
+        // Not one character. A closing quote means a well-formed string,
+        // which O does not have yet; without one the literal is cut off.
+        let closed = ch == '"' || self.input[self.position..].contains(&'"');
+        if closed {
+            Err(QError::Nyi(
+                "strings (a character literal holds exactly one character)".into(),
+            ))
         } else {
-            Err(perr!("Unterminated character literal"))
+            Err(unterminated())
         }
     }
 }

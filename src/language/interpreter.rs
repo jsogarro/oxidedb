@@ -1,4 +1,4 @@
-use crate::error::QError;
+use crate::error::{QError, QResult};
 use crate::language::ast::{BinaryOperator, Expr, UnaryOperator};
 use crate::language::{
     lexer::{Lexer, Token},
@@ -7,10 +7,8 @@ use crate::language::{
 use crate::types::atom::Atom;
 use std::collections::HashMap;
 
-type Result<T> = std::result::Result<T, QError>;
-
 /// i64::MIN is reserved for the long null, so producing it counts as overflow.
-fn checked(result: Option<i64>) -> Result<Atom> {
+fn checked(result: Option<i64>) -> QResult<Atom> {
     match result {
         Some(n) if n != i64::MIN => Ok(Atom::Integer(n)),
         _ => Err(QError::Overflow),
@@ -45,7 +43,7 @@ impl Interpreter {
 
     /// Lex, parse and evaluate one line. `None` means the line had no tokens
     /// (e.g. blank or comment-only).
-    pub fn eval_line(&mut self, input: &str) -> Result<Option<Atom>> {
+    pub fn eval_line(&mut self, input: &str) -> QResult<Option<Atom>> {
         let tokens = Lexer::new(input).tokenize()?;
         if tokens == [Token::Eof] {
             return Ok(None);
@@ -54,7 +52,7 @@ impl Interpreter {
         self.evaluate(ast).map(Some)
     }
 
-    pub fn evaluate(&mut self, expr: Expr) -> Result<Atom> {
+    pub fn evaluate(&mut self, expr: Expr) -> QResult<Atom> {
         match expr {
             Expr::Atom(atom) => Ok(atom),
             Expr::Symbol(name) => self
@@ -84,7 +82,7 @@ impl Interpreter {
         }
     }
 
-    fn apply_binary_op(&self, left: &Atom, op: &BinaryOperator, right: &Atom) -> Result<Atom> {
+    fn apply_binary_op(&self, left: &Atom, op: &BinaryOperator, right: &Atom) -> QResult<Atom> {
         match (left, op, right) {
             // A long null operand yields a long null (`%` is float, handled below).
             (
@@ -124,7 +122,7 @@ impl Interpreter {
         }
     }
 
-    fn apply_unary_op(&self, op: &UnaryOperator, operand: &Atom) -> Result<Atom> {
+    fn apply_unary_op(&self, op: &UnaryOperator, operand: &Atom) -> QResult<Atom> {
         match (op, operand) {
             (UnaryOperator::Negate, Atom::Integer(i64::MIN)) => Ok(Atom::Integer(i64::MIN)),
             (UnaryOperator::Negate, Atom::Integer(n)) => checked(n.checked_neg()),

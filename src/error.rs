@@ -2,7 +2,7 @@
 //! where the name alone would lose information.
 
 /// An error raised while lexing, parsing or evaluating O code.
-#[derive(Debug, Clone, PartialEq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum QError {
     #[error("'type")]
     Type,
@@ -26,4 +26,12 @@ pub enum QError {
     Overflow,
     #[error("'{0}")]
     Signal(String),
+}
+
+pub type QResult<T> = Result<T, QError>;
+
+impl QError {
+    pub fn parse(detail: impl Into<String>) -> Self {
+        QError::Parse(detail.into())
+    }
 }

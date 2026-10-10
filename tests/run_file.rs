@@ -37,7 +37,7 @@ fn run_file_reports_error_once_and_fails() {
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert_eq!(stderr.matches("'parse").count(), 1, "stderr: {stderr}");
     assert!(
-        stderr.contains("'parse: unexpected end of input (line 2)"),
+        stderr.contains("line 2: 'parse: unexpected end of input"),
         "stderr: {stderr}"
     );
     assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "3");

@@ -54,7 +54,7 @@ oxidedb> 1e-3
 oxidedb> 2f
 2f
 ```
-A bare `1e` or `1e+` is an error, and so is a literal too large for a float (`1e999`: `'parse: Float out of range`).
+A bare `1e` or `1e+` is an error, and so is a literal too large for a float (`1e999`: `'parse: float out of range`).
 
 ### Nulls and infinities
 `0N` is the long (integer) null, `0n` is the float null (it also shows up as the result of a calculation that is not a number), and `0w` and `-0w` are the float infinities. They display exactly as typed:
@@ -77,14 +77,14 @@ oxidedb> 0N + 1.5
 oxidedb> 0N % 2
 0n
 ```
-`0N` is stored as the smallest 64-bit integer, so the literal `-9223372036854775808` reads as `0N`. See the overflow section for what happens when a computation lands on that value. `0W` (the long infinity) is not supported.
+`0N` is stored as the smallest 64-bit integer, so the literal `-9223372036854775808` reads as `0N`. See the overflow section for what happens when a computation lands on that value. `0W` (the long infinity) is not supported: it gives `'nyi: 0W (long infinity)`.
 
 Float arithmetic that grows past the largest float gives an infinity, but a float *literal* that is out of range is an error:
 ```
 oxidedb> 1e308 * 10
 0w
 oxidedb> 1e999
-'parse: Float out of range: 1e999
+'parse: float out of range: 1e999
 ```
 
 ### Booleans
@@ -297,7 +297,7 @@ oxidedb> - 5 + 3
 
 ## Reading Errors
 
-O reports an error the way q does: a quote followed by a short name. Some names carry a detail after a colon or in brackets. Each line below is one kind of error:
+O follows q's style for errors: a quote followed by a short name. Some errors add a detail in parentheses or after a colon (`'parse: ...`); q itself does not print `'parse: ...`, the detail is O's addition. Each line below is one kind of error:
 ```
 oxidedb> 1b + 1
 'type
@@ -313,11 +313,11 @@ oxidedb> 6/2
 
 - `'type`: the operands do not fit the operation
 - `'overflow`: an integer result left the 64-bit range
-- `'parse: ...`: the text is not valid O; the detail says what the parser or lexer saw, written as you typed it
+- `'parse: ...`: the text is not valid O; the detail says what the parser or lexer saw, with tokens shown the way O prints them (`1 1e3` reports `1000f`)
 - `'x (Undefined variable)`: the name `x` has not been assigned
-- `'nyi: ...`: not yet implemented; the feature is planned but missing
+- `'nyi: ...`: not yet implemented; the detail names the missing feature, such as an adverb, a string or a symbol
 
-The error replaces the result and the session carries on. When you run a file, the first error stops the run and is printed once with its line number, for example `'type (line 3)`.
+The error replaces the result and the session carries on. When you run a file, the first error stops the run and is printed once with its line number, for example `line 3: 'type`.
 
 ## Exercises
 

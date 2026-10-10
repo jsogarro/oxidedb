@@ -37,7 +37,7 @@ fn errors_parse_kind() {
     }
     assert_eq!(
         err("1e999"),
-        QError::Parse("Float out of range: 1e999".into())
+        QError::Parse("float out of range: 1e999".into())
     );
     // parser failures
     for src in ["1 +", "(1", "+1", ")", "1 2", "1 )"] {
@@ -99,10 +99,7 @@ fn errors_nyi_kind() {
     assert_eq!(err("6\\2"), QError::Nyi("adverb '\\'".into()));
     assert_eq!(err("6/2").to_string(), "'nyi: adverb '/'");
     for src in ["0W", "-0W"] {
-        match err(src) {
-            QError::Nyi(d) => assert!(d.contains("0W"), "{src}: {d}"),
-            other => panic!("{src}: {other:?}"),
-        }
+        assert_eq!(err(src), QError::Nyi("0W (long infinity)".into()), "{src}");
     }
 }
 
