@@ -283,6 +283,43 @@ fn index_assignment_spends_from_the_budget() {
 }
 
 #[test]
+fn statements_share_the_one_line_budget() {
+    // each statement spends one, and so does every operator: the budget is per line, not per statement
+    let flat = |n: usize| vec!["1"; n].join(";");
+    assert!(run_child(&flat(2000), 8192).is_ok());
+    assert!(run_child(&flat(2001), 8192)
+        .unwrap_err()
+        .contains("too long"));
+    // a trailing or empty statement is free
+    assert!(run_child(&format!("{};;", flat(2000)), 8192).is_ok());
+    // operators spread over statements add up: 2 statements + 998 + 1000 operators = 2000
+    let split = |a: usize, b: usize| format!("{}1;{}1", "1+".repeat(a), "1+".repeat(b));
+    assert!(run_child(&split(998, 1000), 8192).is_ok());
+    assert!(run_child(&split(998, 1001), 8192)
+        .unwrap_err()
+        .contains("too long"));
+    assert!(run_child(&split(1001, 998), 8192)
+        .unwrap_err()
+        .contains("too long"));
+    // nesting inside one statement spends from the same budget as the statements around it
+    let nest = |n: usize| format!("{};{}1{}", flat(n), "(".repeat(100), ")".repeat(100));
+    assert!(run_child(&nest(1899), 8192).is_ok()); // 1899 + 101 = 2000
+    assert!(run_child(&nest(1900), 8192)
+        .unwrap_err()
+        .contains("too long"));
+    // a long chain in every statement of a nesting stack is still rejected, not an abort
+    assert_rejected(&format!(
+        "{}1",
+        ("a:".to_string() + &"1+".repeat(300) + "1;").repeat(10)
+    ));
+    // statements do not nest: the depth cap is per statement, so many levels in each are fine
+    let deep = format!("{}1{}", "(".repeat(100), ")".repeat(100));
+    assert!(run_child(&[deep.as_str(); 10].join(";"), 8192).is_ok());
+    // ... but a parenthesis cannot be left open across a `;`
+    assert!(run_child("(1;2", 8192).is_err());
+}
+
+#[test]
 fn leading_minus_variant_is_rejected() {
     for (levels, terms) in [(127, 217), (32, 858)] {
         assert_rejected(&format!("{}1", ("1+".repeat(terms) + "- ").repeat(levels)));

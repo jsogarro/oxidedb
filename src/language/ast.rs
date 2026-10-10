@@ -19,6 +19,12 @@ pub enum Expr {
         func: Box<Expr>,
         args: Vec<Expr>,
     },
+    /// Statements `a;b;c` at the top level of a line, run left to right. The value is the last
+    /// statement's (`()` when there is none); `silent` marks a trailing `;`, which prints nothing.
+    Sequence {
+        statements: Vec<Expr>,
+        silent: bool,
+    },
     /// `(a;b;c)`: two or more items, in source order.
     List(Vec<Expr>),
     Assignment {

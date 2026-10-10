@@ -126,8 +126,35 @@ impl Parser {
         }
     }
 
+    /// A line: statements separated by `;`, empty ones skipped. All of them spend from the one
+    /// budget, so a line is the unit however many statements it holds. One plain statement
+    /// parses to itself; anything else (`;` present) is an `Expr::Sequence`.
     pub fn parse(&mut self) -> QResult<Expr> {
-        let expr = self.expression()?;
+        let mut statements = Vec::new();
+        let mut separated = false;
+        let mut silent = false;
+        loop {
+            if self.match_tokens(&[Token::Semicolon]) {
+                separated = true;
+                silent = true;
+                continue;
+            }
+            if self.is_at_end() {
+                break;
+            }
+            statements.push(self.expression()?);
+            silent = false;
+            if !self.match_tokens(&[Token::Semicolon]) {
+                break;
+            }
+            separated = true;
+            silent = true;
+        }
+        let expr = match (statements.len(), separated) {
+            (0, false) => return Err(QError::parse("unexpected end of input")),
+            (1, false) => statements.remove(0),
+            _ => Expr::Sequence { statements, silent },
+        };
         if !self.is_at_end() {
             if let Some(err) = nyi_token(self.peek()) {
                 return Err(err);
@@ -186,11 +213,11 @@ impl Parser {
         let mut joins = Vec::new();
         loop {
             let mut operand = self.unary()?;
-            // `v[0]:5`, wherever it stands in the chain; it takes the rest of the input.
+            // `v[0]:5`, wherever it stands in the chain; it takes the rest of the statement (up to the next `;`).
             if matches!(operand, Expr::Apply { .. }) && self.match_tokens(&[Token::Colon]) {
                 operand = self.index_assignment(operand)?;
             }
-            // An assignment in operand position (`x+y:2`) takes the rest of the input.
+            // An assignment in operand position (`x+y:2`) takes the rest of the statement, up to the next `;`.
             if let (false, Expr::Symbol(name)) = (operands.is_empty(), &operand) {
                 if self.match_tokens(&[Token::Colon]) {
                     assignable(name)?;

@@ -92,6 +92,7 @@ Phase 1 of the O language implementation is **complete** with a fully functional
 - ✅ Basic atoms (integers, floats, booleans, characters)
 - ✅ Simple arithmetic operations with right-to-left evaluation
 - ✅ Variable assignment and retrieval (`:` operator)
+- ✅ Several statements on a line (`x:5;x-1`; a trailing `;` prints nothing)
 - ✅ Interactive REPL with file execution support
 
 #### Phase 2: Vectors and Lists (book Chapter 3) 🚧 **IN PROGRESS**
@@ -181,7 +182,7 @@ $ cargo run -- book/examples/01-atoms-and-arithmetic.o
 Complete guide to the O programming language located in `/book/`:
 - **Introduction**: Overview of O and OxideDB
 - **Chapter 1**: Atoms and Basic Arithmetic
-- **Chapter 2**: Variables and Assignment
+- **Chapter 2**: Variables and Assignment (including several statements on a line with `;`)
 - **Chapter 3**: Vectors and Lists (in progress: vector literals, arithmetic, comparison, `til`, `count`, `enlist`, indexing, item assignment, general lists, take and join)
 
 ### Executable Examples
