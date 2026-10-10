@@ -55,3 +55,32 @@ fn atoms_timestamp_display_q_format() {
         "2024.01.15D09:30:00.123456789"
     );
 }
+
+#[test]
+fn atoms_temporal_nulls_and_values() {
+    use chrono::{NaiveDate, NaiveTime};
+    assert!(Atom::NullDate.is_null());
+    assert!(Atom::NullTime.is_null());
+    assert!(Atom::NullTimestamp.is_null());
+    let d = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
+    assert!(!Atom::Date(d).is_null());
+    assert!(!Atom::Time(NaiveTime::from_hms_opt(9, 30, 0).unwrap()).is_null());
+    assert!(!Atom::Timestamp(Utc.with_ymd_and_hms(2024, 1, 15, 9, 30, 0).unwrap()).is_null());
+}
+
+#[test]
+fn atoms_non_null_edge_values() {
+    assert!(!Atom::Integer(i64::MAX).is_null());
+    assert!(!Atom::Integer(0).is_null());
+    assert!(!Atom::Float(f64::INFINITY).is_null());
+    assert!(!Atom::Float(f64::NEG_INFINITY).is_null());
+    assert!(!Atom::Float(0.0).is_null());
+    assert!(!Atom::Character('\0').is_null());
+    assert!(!Atom::Character('a').is_null());
+}
+
+#[test]
+fn atoms_float_null_derived_eq_is_unequal() {
+    // Documents derived PartialEq: NaN != NaN. `0n=0n` must be handled in the comparison kernel.
+    assert_ne!(Atom::Float(f64::NAN), Atom::Float(f64::NAN));
+}
