@@ -77,7 +77,7 @@ impl Lexer {
         let mut tokens = Vec::new();
 
         loop {
-            match self.next_token()? {
+            match self.next_token(tokens.last())? {
                 Token::Eof => {
                     tokens.push(Token::Eof);
                     break;
@@ -89,7 +89,7 @@ impl Lexer {
         Ok(tokens)
     }
 
-    fn next_token(&mut self) -> Result<Token> {
+    fn next_token(&mut self, prev: Option<&Token>) -> Result<Token> {
         self.skip_whitespace();
 
         match self.current_char {
@@ -99,6 +99,7 @@ impl Lexer {
                     self.advance();
                     Ok(Token::Plus)
                 }
+                '-' if self.starts_negative_literal(prev) => self.read_number(),
                 '-' => {
                     self.advance();
                     Ok(Token::Minus)
@@ -158,9 +159,40 @@ impl Lexer {
         }
     }
 
+    /// q rule: `-` glued to a digit is part of the number at input start or
+    /// after a non-noun; after a noun only when preceded by whitespace (`2 -1`).
+    fn starts_negative_literal(&self, prev: Option<&Token>) -> bool {
+        if !self
+            .input
+            .get(self.position + 1)
+            .is_some_and(char::is_ascii_digit)
+        {
+            return false;
+        }
+        let spaced = self.position > 0 && self.input[self.position - 1].is_whitespace();
+        match prev {
+            None => true,
+            Some(
+                Token::Integer(_)
+                | Token::Float(_)
+                | Token::Boolean(_)
+                | Token::Character(_)
+                | Token::Symbol(_)
+                | Token::RightParen
+                | Token::RightBracket,
+            ) => spaced,
+            Some(_) => true,
+        }
+    }
+
     fn read_number(&mut self) -> Result<Token> {
         let mut number = String::new();
         let mut is_float = false;
+
+        if self.current_char == Some('-') {
+            number.push('-');
+            self.advance();
+        }
 
         while let Some(ch) = self.current_char {
             if ch.is_ascii_digit() {
@@ -173,6 +205,17 @@ impl Lexer {
             } else {
                 break;
             }
+        }
+
+        if (number == "0" || number == "1")
+            && self.current_char == Some('b')
+            && !self
+                .input
+                .get(self.position + 1)
+                .is_some_and(|c| c.is_alphanumeric() || *c == '_')
+        {
+            self.advance();
+            return Ok(Token::Boolean(number == "1"));
         }
 
         if is_float {
@@ -200,14 +243,7 @@ impl Lexer {
             }
         }
 
-        // Check for boolean literals
-        let token = match identifier.as_str() {
-            "1b" => Token::Boolean(true),
-            "0b" => Token::Boolean(false),
-            _ => Token::Symbol(identifier),
-        };
-
-        Ok(token)
+        Ok(Token::Symbol(identifier))
     }
 
     fn read_character(&mut self) -> Result<Token> {
