@@ -1,5 +1,6 @@
 use crate::error::{QError, QResult};
 use crate::language::interpreter::Interpreter;
+use crate::types::value::Value;
 use anyhow::{Context, Result};
 use rustyline::{error::ReadlineError, DefaultEditor};
 use std::io::IsTerminal;
@@ -135,11 +136,16 @@ impl Repl {
         Ok(())
     }
 
-    /// Evaluates one line; `None` for input with no tokens (e.g. a comment).
+    /// Evaluates one line; `None` for input with no tokens (e.g. a comment) and for `()`,
+    /// which q prints as nothing at all (not even an empty line).
     pub fn eval_line(&mut self, input: &str) -> QResult<Option<String>> {
         if input.starts_with("\\\\") {
             return Err(QError::Nyi("system command".into()));
         }
-        Ok(self.interpreter.eval_line(input)?.map(|v| v.to_string()))
+        Ok(self
+            .interpreter
+            .eval_line(input)?
+            .filter(|v| !matches!(v, Value::List(l) if l.is_empty()))
+            .map(|v| v.to_string()))
     }
 }

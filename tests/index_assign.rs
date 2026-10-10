@@ -510,7 +510,7 @@ fn iassign_library_values() {
     i.set("e", Value::List(Rc::new(vec![])));
     assert_eq!(
         i.eval_line("v[e]:5").map(|v| v.unwrap().to_string()),
-        Ok("()".into())
+        Ok("".into()) // the empty list displays as nothing, as in q
     );
     assert_eq!(i.get("v"), Some(&longs(&[1, 2, 3])));
     // a non-empty general list is not an index

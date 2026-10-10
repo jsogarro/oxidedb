@@ -192,6 +192,59 @@ fn application_and_bracket_links_spend_from_the_budget() {
     .contains("nested too deeply"));
 }
 
+/// `levels` nested `(...)` lists: each outer level holds `lead` ones and then the next level;
+/// the innermost holds `inner` ones.
+fn list_chain(levels: usize, lead: usize, inner: usize) -> String {
+    let open = format!("({}", "1;".repeat(lead));
+    let core = vec!["1"; inner].join(";");
+    format!(
+        "{}({core}){}",
+        open.repeat(levels - 1),
+        ")".repeat(levels - 1)
+    )
+}
+
+#[test]
+fn list_items_spend_from_the_budget() {
+    // a flat list: the line spends one and each item one, so 1,999 items fit
+    let flat = |n: usize| format!("({})", vec!["1"; n].join(";"));
+    assert!(run_child(&flat(1999), 8192).is_ok());
+    assert!(run_child(&flat(2000), 8192)
+        .unwrap_err()
+        .contains("too long"));
+    // ... and the budget is shared across levels: 1 + 59 * 10 + inner <= 2000
+    assert!(run_child(&list_chain(60, 9, 1409), 8192).is_ok());
+    assert!(run_child(&list_chain(60, 9, 1410), 8192)
+        .unwrap_err()
+        .contains("too long"));
+    // the abort shapes: lists nested 127 levels deep, each opened after a run of items
+    // 1 + 126 * 15 + 15 = 1906 fits the budget, but 127 levels of value is past the value cap
+    assert!(run_child(&list_chain(127, 14, 15), 8192)
+        .unwrap_err()
+        .contains("limit"));
+    assert!(run_child(&list_chain(64, 14, 15), 8192).is_ok());
+    assert_rejected(&list_chain(127, 15, 16)); // 2,033
+                                               // a `;`-chain hung off every level of a bracket spine
+    assert_rejected(&format!(
+        "{}0{}",
+        "1 2 3[(0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;".repeat(127),
+        "0)]".repeat(127)
+    ));
+    // lists spend alongside operators and juxtaposition on the same budget
+    let mixed = |ops: usize| format!("{}({})", "1+".repeat(ops), vec!["1"; 1000].join(";"));
+    assert!(run_child(&mixed(999), 8192).is_ok()); // 1 + 999 joins + 1000 items = 2000
+    assert!(run_child(&mixed(1000), 8192)
+        .unwrap_err()
+        .contains("too long"));
+    // nesting is capped at 128 levels
+    assert!(run_child(
+        &format!("{}1;1{}", "(1;".repeat(128), ")".repeat(128)),
+        8192
+    )
+    .unwrap_err()
+    .contains("nested too deeply"));
+}
+
 /// `v[0]:` + a `k`-operator chain, and the chain inside the index instead. `v` is unbound, so a
 /// line that parses ends in the evaluation error `'v (Undefined variable)`.
 #[test]
@@ -320,6 +373,104 @@ fn budget_boundary_is_pinned() {
         run_child(&format!("{}{}", "1+".repeat(1873), minus(127)), 8192)
             .unwrap_err()
             .contains("too long")
+    );
+}
+
+// ---- values nested one level per line ----
+
+/// `lines` fed to the REPL on stdin; returns (stdout, stderr, exit code). The process must
+/// exit normally: a recursive display, comparison or drop that overflows would abort it.
+fn repl(lines: &[String]) -> (String, String, Option<i32>) {
+    // Output goes to files: the echo of 300 nested assignments overflows a pipe nobody reads.
+    static RUNS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let tag = format!(
+        "{}_{}",
+        std::process::id(),
+        RUNS.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    );
+    let dir = std::env::temp_dir();
+    let (so, se) = (
+        dir.join(format!("nest_out_{tag}")),
+        dir.join(format!("nest_err_{tag}")),
+    );
+    let mut child = Command::new(BIN)
+        .stdin(Stdio::piped())
+        .stdout(std::fs::File::create(&so).unwrap())
+        .stderr(std::fs::File::create(&se).unwrap())
+        .spawn()
+        .unwrap();
+    let mut stdin = child.stdin.take().unwrap();
+    let input = lines.join("\n") + "\nexit\n";
+    let feeder = std::thread::spawn(move || {
+        let _ = stdin.write_all(input.as_bytes());
+    });
+    let out = wait_timeout(child, "binary");
+    feeder.join().unwrap();
+    let text = |p: &std::path::Path| {
+        let s = std::fs::read_to_string(p).unwrap_or_default();
+        let _ = std::fs::remove_file(p);
+        s
+    };
+    (text(&so), text(&se), out.status.code())
+}
+
+#[test]
+fn nesting_one_level_per_line_ends_in_limit_not_an_abort() {
+    for (form, count) in [("l:enlist l", "1"), ("l:(l;1)", "2"), ("l:(1;l)", "2")] {
+        // cap = 64 levels: the first 64 lines fit and the 50 after them are 'limit
+        let mut lines = vec!["l:1 2".to_string()];
+        lines.extend((0..64 + 50).map(|_| form.to_string()));
+        lines.extend(["l=l", "l+1", "neg l", "count l", "l"].map(String::from));
+        let (stdout, stderr, code) = repl(&lines);
+        assert_eq!(code, Some(0), "{form}: {stderr:.200}");
+        assert_eq!(stderr.matches("'limit").count(), 50, "{form}");
+        assert!(
+            !stderr.contains("overflow") || !stderr.contains("stack"),
+            "{form}"
+        );
+        assert!(stdout.lines().any(|l| l == count), "{form}: {stdout:.200}");
+        // boundary: exactly 64 levels raises nothing
+        let ok: Vec<String> = std::iter::once("l:1 2".to_string())
+            .chain((0..64).map(|_| form.to_string()))
+            .chain(["l=l".to_string()])
+            .collect();
+        let (_, stderr, code) = repl(&ok);
+        assert_eq!(
+            (code, stderr.contains("'limit")),
+            (Some(0), false),
+            "{form}"
+        );
+    }
+}
+
+#[test]
+fn sharing_cannot_double_a_value_without_bound() {
+    // `l:(l;l)` stays about 20 levels deep but doubles its logical size each line: the 1M-item cap
+    // stops it, and the operations that walk every path then finish at once. The assignments are wrapped in
+    // `count` so that the REPL does not echo a value of millions of items each time.
+    let mut lines = vec!["l:1 2".to_string()];
+    lines.extend((0..60).map(|_| "m:count l:(l;l)".to_string()));
+    lines.extend(
+        [
+            "count l+1",
+            "count (l=l)",
+            "count neg l",
+            "count l,l",
+            "count 2#l",
+            "count l",
+        ]
+        .map(String::from),
+    );
+    let started = Instant::now();
+    let (stdout, stderr, code) = repl(&lines);
+    assert_eq!(code, Some(0), "{stderr:.200}");
+    // sizes go 2, 5, 11, ... 3 * 2^k - 1: 18 rounds fit under 1M items, the 42 after them are 'limit, and so is `l,l`, which doubles it again
+    assert_eq!(stderr.matches("'limit").count(), 43, "{stderr:.200}");
+    assert!(stdout.lines().any(|l| l == "2"), "count l: {stdout:.100}");
+    assert!(
+        started.elapsed() < Duration::from_secs(45),
+        "{:?}",
+        started.elapsed()
     );
 }
 

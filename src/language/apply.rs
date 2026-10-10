@@ -36,11 +36,7 @@ fn index(f: &Value, i: &Value) -> QResult<Value> {
             let n = usize::try_from(position(a)?).unwrap_or(usize::MAX);
             Ok(match f {
                 Value::Vector(c) => Value::Atom(c.get(n)),
-                // ponytail: q gives the null of the first item's type; a long null until lists can be built
-                Value::List(items) => items
-                    .get(n)
-                    .cloned()
-                    .unwrap_or(Value::Atom(Atom::Integer(i64::MIN))),
+                Value::List(items) => items.get(n).cloned().unwrap_or_else(|| null_like(items)),
                 Value::Atom(_) => unreachable!("atoms are rejected before indexing"),
             })
         }
@@ -64,6 +60,23 @@ fn index(f: &Value, i: &Value) -> QResult<Value> {
             let out = items.iter().map(|x| index(f, x));
             Ok(Value::from_items(out.collect::<QResult<_>>()?))
         }
+    }
+}
+
+/// What an out-of-range index into a general list gives: the null of its first item
+/// (an atom's null, an empty vector of a vector's type, a list of nulls for a list),
+/// and `()` for the empty list.
+fn null_like(items: &[Value]) -> Value {
+    match items.first() {
+        None => Value::List(Rc::default()),
+        Some(Value::Atom(a)) => Value::Atom(a.null_like()),
+        Some(Value::Vector(c)) => Value::Vector(Rc::new(c.index(&[]))),
+        Some(Value::List(inner)) => Value::from_items(
+            inner
+                .iter()
+                .map(|v| null_like(std::slice::from_ref(v)))
+                .collect(),
+        ),
     }
 }
 

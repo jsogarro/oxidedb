@@ -193,17 +193,7 @@ impl fmt::Display for Value {
         match self {
             Value::Atom(a) => a.fmt(f),
             Value::Vector(c) => c.fmt(f),
-            // ponytail: one item per line; q's exact nested layout arrives with #51.
-            Value::List(items) if items.is_empty() => f.write_str("()"),
-            Value::List(items) => {
-                for (i, v) in items.iter().enumerate() {
-                    if i > 0 {
-                        f.write_str("\n")?;
-                    }
-                    v.fmt(f)?;
-                }
-                Ok(())
-            }
+            Value::List(items) => super::display::fmt_list(f, items),
         }
     }
 }

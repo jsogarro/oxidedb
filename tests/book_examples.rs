@@ -406,3 +406,20 @@ fn checker_errors_are_q_style() {
         "failed unexpectedly: 'type"
     ));
 }
+
+#[test]
+fn checker_multiline_and_empty_output() {
+    // a result may span lines; an expression that prints nothing is a prompt with no output
+    let md = "```\noxidedb> (1;`a)\n1\n`a\noxidedb> ()\noxidedb> 2\n2\n```\n";
+    assert_eq!(check_chapter("f.md", md), Vec::<String>::new());
+    // ... and the lines must match exactly, and output must not be missing or surplus
+    let wrong = "```\noxidedb> (1;`a)\n1\n`b\n```\n";
+    assert!(reports(&check_chapter("f.md", wrong), "actual:   1\n`a"));
+    let missing = "```\noxidedb> (1;`a)\noxidedb> 2\n2\n```\n";
+    assert!(reports(&check_chapter("f.md", missing), "actual:   1\n`a"));
+    let surplus = "```\noxidedb> ()\n1\n```\n";
+    assert!(reports(
+        &check_chapter("f.md", surplus),
+        "expected: 1\n    actual:   "
+    ));
+}

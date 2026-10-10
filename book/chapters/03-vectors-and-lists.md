@@ -1,6 +1,6 @@
 # Chapter 3: Vectors and Lists
 
-So far every value has been a single atom. Real data comes in bunches: a week of temperatures, a column of prices, the names of your customers. O is an array language, so a list of values is as easy to write as a single one, and later chapters build tables and queries out of such lists. This chapter is in progress: it covers how to write vectors, store them, compute with them, compare them and pick items out of them, and ends with a list of what is still to come.
+So far every value has been a single atom. Real data comes in bunches: a week of temperatures, a column of prices, the names of your customers. O is an array language, so a list of values is as easy to write as a single one, and later chapters build tables and queries out of such lists. This chapter is in progress: it covers how to write vectors, store them, compute with them, compare them and pick items out of them, how to build general lists that mix types or nest, and ends with a list of what is still to come.
 
 ## Why Vectors?
 
@@ -11,7 +11,7 @@ oxidedb> 1 2 3 + 10
 ```
 No loop, no index: the `+` is applied to every item.
 
-In this book a **list** is the general word for an ordered collection of values, and a **vector** is a list whose items all have the same type. Every list literal in this chapter is a vector. O stores it compactly and applies an operation to every item in one step instead of making you write a loop. A list of numbers is written by putting the numbers next to each other, separated by spaces.
+In this book a **list** is the general word for an ordered collection of values, and a **vector** is a list whose items all have the same type. Until the General Lists section every list literal in this chapter is a vector. O stores it compactly and applies an operation to every item in one step instead of making you write a loop. A list of numbers is written by putting the numbers next to each other, separated by spaces.
 
 ## Vector Literals
 
@@ -82,7 +82,7 @@ oxidedb> "tab\there"
 The escapes are the same as for a single character: `\n`, `\t`, `\r`, `\\` and `\"`.
 
 ### Atom or list?
-The same-looking value can be an atom or a list. `5` is an atom; there is no way to type a one-item list as a plain literal. The display of a one-item list starts with a comma, which is how you will tell them apart once you can build one:
+The same-looking value can be an atom or a list. `5` is an atom; there is no way to type a one-item list as a plain literal (`enlist`, below, builds one). The display of a one-item list starts with a comma, which is how you tell them apart:
 
 | Written | What it is |
 | --- | --- |
@@ -699,7 +699,7 @@ oxidedb> 1 2,0#1 2
 oxidedb> (0#1 2),1 2
 1 2
 ```
-Join **never converts types**. When the two sides have the same type the result is a vector, but joining a long with a float gives a *general list*, a list whose items keep their own types, not a float vector. A general list is displayed one item per line (O's display of nested lists will be refined later), and you cannot yet type one directly:
+Join **never converts types**. When the two sides have the same type the result is a vector, but joining a long with a float gives a *general list*, a list whose items keep their own types, not a float vector. A general list is displayed one item per line (the General Lists section below explains the display, and how to write one directly):
 ```
 oxidedb> 1,2.5
 1
@@ -722,14 +722,179 @@ oxidedb> (1 2,3) = 1 2 4
 110b
 ```
 
+## General Lists
+
+A vector holds items of one type. A **general list** holds anything: numbers next to symbols, strings, other lists. You write one with parentheses and semicolons, `(a;b;c)`, and every item is an expression:
+```
+oxidedb> (1;`a;2.5)
+1
+`a
+2.5
+oxidedb> ("abc";1)
+"abc"
+1
+```
+A general list prints one item per line. Its type code is 0, where a vector has a positive one.
+
+### Same types collapse to a vector
+If the items are all atoms of one type, the list *is* the vector. `(1;2;3)` and `1 2 3` are the same value. Mixed types are not promoted, as they are in the literal `1 2.5`: `(1;2.5)` stays a general list holding a long and a float:
+```
+oxidedb> (1;2;3)
+1 2 3
+oxidedb> (`a;`b)
+`a`b
+oxidedb> ("a";"b")
+"ab"
+oxidedb> (1;2.5)
+1
+2.5
+oxidedb> (1+1;2*3)
+2 6
+```
+
+### Parentheses alone only group
+`(1)` is the atom `1`, not a list of one item. A list needs a semicolon, or `enlist`:
+```
+oxidedb> (1)
+1
+oxidedb> (1 2)
+1 2
+oxidedb> enlist 1
+,1
+```
+`enlist` makes a one-item list. An atom becomes a one-item vector (note the comma). A vector becomes a general list holding it, which prints like the vector, because there is only one item to print, but it is still a list of one item:
+```
+oxidedb> enlist 1 2
+1 2
+oxidedb> count enlist 1 2
+1
+oxidedb> count 1 2
+2
+```
+(In q `enlist` takes several arguments; in O it takes one, and `enlist[1;2]` is a `'rank` error.)
+
+### Right to left
+The items are evaluated from the right, like everything else, so an assignment in one item is seen by the items on its left:
+```
+oxidedb> x:5
+5
+oxidedb> (x:1;x)
+1 5
+oxidedb> x
+1
+```
+The `x` on the right was read first, while `x` still held 5.
+
+### Nested lists
+Items can be lists. A nested list that collapses (`(2;3)` is `2 3`) is just a vector item, and one that does not is shown in parentheses on a single line:
+```
+oxidedb> (1 2;3 4)
+1 2
+3 4
+oxidedb> (1;(2;3))
+1
+2 3
+oxidedb> (1;(2;`a))
+1
+(2;`a)
+oxidedb> (1;(2;(3;`a)))
+1
+(2;(3;`a))
+```
+
+A value may nest lists at most 64 levels deep and hold at most a million items counted along every path (`l:(l;l)` doubles the count each time it runs, even though the two items are the same list). Past either limit the line fails with `'limit` and nothing changes.
+
+### How lists print
+A general list prints one line per item, and an item that is a general list is written in its parenthesised form. There is one exception, and it comes from q: when every item is a vector (or list) of the same length, the items are rows of a table, and the columns are padded so that they line up. The cells are printed bare, with no type marks: symbols have no backtick, and a null is blank:
+```
+oxidedb> (10 2;3 4)
+10 2
+3  4
+oxidedb> (1 2;`a`b)
+1 2
+a b
+oxidedb> (0N 2;3 4)
+  2
+3 4
+oxidedb> (1 2;3 4 5)
+1 2
+3 4 5
+```
+The last list has rows of different lengths, so each row prints on its own. So do rows that are all boolean vectors or all strings (`(101b;010b)` prints `101b` and `010b`). O prints every item in full, where q cuts a long line or a tall list short with `..`; this is the same as for vectors.
+
+### The empty list
+`()` is the empty general list. It has no items, and the console prints **nothing** for it, not even an empty line, as q does. That is why the sample below has no output line:
+```
+oxidedb> ()
+oxidedb> count ()
+0
+oxidedb> (1;())
+1
+()
+```
+Inside another list it shows as `()`.
+
+### Counting and indexing
+`count` counts the items, and indexing works as for a vector: an atom index gives an item, a vector of indexes gives a new list, normalised again (so if the chosen items share a type the result is a vector):
+```
+oxidedb> l:(1;`a;2.5)
+1
+`a
+2.5
+oxidedb> count l
+3
+oxidedb> l 1
+`a
+oxidedb> l[0 2]
+1
+2.5
+oxidedb> l 0 0
+1 1
+oxidedb> (1;2 3) 1 0
+2 3
+1
+```
+An index out of range gives the null of the **first item's** type, as in q: a long null for a list that starts with a long, the null symbol for one that starts with a symbol, and an empty vector of the first item's type for a list that starts with a vector:
+```
+oxidedb> l 7
+0N
+oxidedb> l 0 7
+1 0N
+oxidedb> (`a;1) 7
+`
+oxidedb> (1 2;3 4) 7
+`long$()
+```
+Indexing a list with two indexes, `l[0;1]`, is not supported yet.
+
+### Everything else works through lists
+Arithmetic and comparison go item by item, into nested lists. Take and join treat the items like the elements of a vector, and join is how a long and a float make a general list (`1,2.5` above):
+```
+oxidedb> (1;2 3) + 10
+11
+12 13
+oxidedb> (1;`a),2
+1
+`a
+2
+oxidedb> 2#(1;`a;3)
+1
+`a
+oxidedb> -1#(1;`a;3)
+,3
+oxidedb> (1;2.5) = (1;2.5)
+11b
+```
+Adding to a symbol is still a `'type` error, so `(1;`a)+1` fails. A list item that is left out, as in `(1;;2)`, is not supported yet.
+
 ## Unfinished Business
 
 Some things that look like they should work are not supported yet. Each gives a clear error rather than a wrong answer.
 
-General lists, written with parentheses and semicolons, are not built yet:
+A list with an item left out (q puts a generic null there) is one:
 ```
-oxidedb> (1;2;3)
-'nyi: general lists
+oxidedb> (1;;2)
+'nyi: elided list item
 ```
 Adverbs such as over are also still to come:
 ```
@@ -742,7 +907,6 @@ Changing an item of an item, and the combined forms of assignment, are the last 
 
 These parts of the chapter will be added as the features arrive. None of them work yet, so there are no samples for them:
 
-- general (mixed or nested) lists, written with parentheses and semicolons
 - changing an item of an item (`d[0][1]:5`) and the combined forms (`d[0]+:1`)
 - several statements on one line, separated by `;`
 - adverbs and functions
@@ -769,6 +933,11 @@ These parts of the chapter will be added as the features arrive. None of them wo
 18. Is `(1,2) , 3.5` a float vector? Predict, then run it.
 19. With `a:1 2 3 4 5`, change the middle item to 0 and the first and last to 9 in two statements. Print `a`.
 20. Predict `b:a`, then `a[0]:7`: what are `a` and `b`? Predict `a[5]:1`, `a[0]:1.5` and `a[5]` before you run them, and say which two are errors and why the third is not.
+21. Which of `(1;2;3)`, `(1;2.5)` and `(1;`a)` is a vector? What is the type code of the others?
+22. With `x:5`, predict `(x:1;x)`, then check what `x` is afterwards.
+23. Make a list of one item that is the vector `1 2`, and check that its `count` is 1. What does `enlist 1` print, and why is it different from `1`?
+24. With `l:(1;`a;2.5)`, predict `l 7` and `l 0 7`, then run them.
+25. Predict how `(100 2;3 4;5 6)` prints, then run it. Why are the columns padded?
 
 ## Key Takeaways
 
@@ -786,5 +955,7 @@ These parts of the chapter will be added as the features arrive. None of them wo
 - `neg` negates, as O's leading minus does
 - `+ - * %` work item by item on vectors: an atom is paired with every item, two vectors pair up if they have the same length (`'length` otherwise), `%` gives floats, and symbols and strings are `'type`
 - `n#v` takes the first `n` items (wrapping; negative from the end; an atom repeats); `x,y` joins and never converts types, so `1,2.5` is a general list
+- `(a;b;c)` builds a general list, evaluated right to left; items of one atom type collapse to a vector (`(1;2;3)` is `1 2 3`), anything else stays a list (type 0) that prints one item per line; `(1)` is just `1`, `()` is the empty list and prints nothing, and `enlist` makes a one-item list
+- A list of equal-length vectors prints as aligned columns; an out-of-range index into a list gives the null of the first item's type
 - `v[i]:x` replaces items in place (`v[0 2]:7 8` pairwise, `v[0 2]:9` for every index, the last of a repeated index wins) and a copy made with another name is not changed; the value must have the vector's exact type (`'type`, never converted) and an out-of-range index is `'length` where a read gives a null
-- General lists, changing an item of an item, `;` statements, adverbs and functions are still to come
+- General lists are done; changing an item of an item, `;` statements, adverbs and functions are still to come
