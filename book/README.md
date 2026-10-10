@@ -34,11 +34,11 @@ You can exit the REPL using `exit`, `quit`, or `\\`.
 
 ## Running Examples
 
-The `/examples` directory contains executable O files demonstrating the concepts from each chapter. Run them with:
+The `book/examples` directory contains executable O files demonstrating the concepts from each chapter (see [its README](examples/README.md)). Run them with:
 
 ```bash
 cargo run -- book/examples/01-atoms-and-arithmetic.o
 cargo run -- book/examples/02-variables-and-assignment.o
 ```
 
-Each file includes detailed comments explaining the expected output.
+Each file includes detailed comments explaining the expected output. `cargo test --test book_examples` evaluates every `// Expected output:` line and every `oxidedb>` sample in the chapters, so the book fails the build when it drifts from the interpreter.
