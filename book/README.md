@@ -7,7 +7,7 @@ A comprehensive guide to the O programming language and OxideDB database system.
 - [Introduction](chapters/00-introduction.md)
 - [Chapter 1: Atoms and Basic Arithmetic](chapters/01-atoms-and-arithmetic.md)
 - [Chapter 2: Variables and Assignment](chapters/02-variables-and-assignment.md)
-- [Chapter 3: Vectors and Lists](chapters/03-vectors-and-lists.md) (in progress: literals and arithmetic so far)
+- [Chapter 3: Vectors and Lists](chapters/03-vectors-and-lists.md) (in progress: vector literals, arithmetic, comparison, `til`, `count`, `neg`, indexing, take and join so far)
 
 ### Coming Soon
 

@@ -294,13 +294,34 @@ fn apply_builtin_names_cannot_be_assigned() {
         // and it still works as the builtin afterwards
         assert!(i.eval_line(&format!("{name} 3")).is_ok());
     }
-    // right to left: the right side runs before the assignment is refused
+    // refused while parsing, so nothing on the right runs, in any position
     let mut i = Interpreter::new();
     assert!(i.eval_line("til:a:7").is_err());
-    assert_eq!(i.get("a"), Some(&long(7)));
+    assert_eq!(i.get("a"), None);
+    assert_eq!(
+        i.eval_line("1+count:2"),
+        Err(QError::parse("cannot assign to builtin count"))
+    );
     // other names are free
     assert_eq!(eval("tilde:5"), Ok(long(5)));
     assert_eq!(eval("counts:5"), Ok(long(5)));
+}
+
+#[test]
+fn apply_arguments_run_before_the_name_is_resolved() {
+    // `w` is unknown until the argument assigns it: the argument is evaluated first, so the
+    // name then resolves to the new variable and indexes it (q gives the same).
+    assert_eq!(eval("w[w:0 1]"), Ok(longs(&[0, 1])));
+    // the same for a builtin name: a variable assigned in the argument is not consulted
+    // before the argument has run, and the builtin still applies when no variable exists
+    assert_eq!(eval("count[w:0 1]"), Ok(long(2)));
+}
+
+#[test]
+fn apply_bracket_arguments_report_nyi_tokens() {
+    assert_eq!(err(&[V, "v[1 $ 2]"]), QError::Nyi("$".into()));
+    assert_eq!(err(&[V, "v[1 {"]), QError::Nyi("{".into()));
+    assert_eq!(err(&[V, "v[1 @ 2]"]), QError::Nyi("@".into()));
 }
 
 #[test]
@@ -418,6 +439,14 @@ fn apply_bracket_syntax_errors() {
     assert_eq!(err(&[V, "v[;]"]), QError::Nyi("elided argument".into()));
     // item assignment is not built yet
     assert_eq!(err(&[V, "v[0]:5"]), QError::Nyi("index assignment".into()));
+    assert_eq!(
+        err(&[V, "1+v[0]:5"]),
+        QError::Nyi("index assignment".into())
+    );
+    assert_eq!(
+        err(&[V, "(v[0]):5"]),
+        QError::Nyi("index assignment".into())
+    );
     // lambdas, adverbs and the other application forms keep their nyi
     assert_eq!(eval("{x} 1"), Err(QError::Nyi("{".into())));
     assert_eq!(eval("1 @ 2"), Err(QError::Nyi("@".into())));
@@ -462,20 +491,21 @@ fn shape(src: String) -> Result<String, String> {
 #[test]
 fn apply_chain_limits_hold() {
     let n = 200_000;
-    let too_long = Err("'parse: expression too long".to_string());
-    assert_eq!(shape(format!("{}1", "count ".repeat(n))), too_long);
-    assert_eq!(shape(format!("{}1", "neg ".repeat(n))), too_long);
-    assert_eq!(v_session(format!("{}1", "v ".repeat(n))), too_long);
-    // 1,999 joins are fine, 2,000 are not (the same boundary as operator chains)
+    let too_long =
+        |r: Result<String, String>| r.is_err_and(|e| e.starts_with("'parse: expression too long"));
+    assert!(too_long(shape(format!("{}1", "count ".repeat(n)))));
+    assert!(too_long(shape(format!("{}1", "neg ".repeat(n)))));
+    assert!(too_long(v_session(format!("{}1", "v ".repeat(n)))));
+    // The line spends one, each join one: 1,999 joins are fine, 2,000 are not.
     assert_eq!(shape(format!("{}1", "count ".repeat(1999))), Ok("1".into()));
-    assert_eq!(shape(format!("{}1", "count ".repeat(2000))), too_long);
+    assert!(too_long(shape(format!("{}1", "count ".repeat(2000)))));
     // verbs and applications share one budget
-    assert_eq!(shape(format!("{}1", "count 1+".repeat(1000))), too_long);
-    // a chain of postfix brackets is capped too
+    assert!(too_long(shape(format!("{}1", "count 1+".repeat(1000)))));
+    // each postfix bracket spends a link and its argument expression: 1 + 2k <= 2000
     let chain = |k: usize| format!("v{}", "[0]".repeat(k));
-    assert_eq!(v_session(chain(5000)), too_long);
-    assert_eq!(v_session(chain(1999)), Err("'type".to_string()));
-    assert_eq!(v_session(chain(2000)), too_long);
+    assert!(too_long(v_session(chain(5000))));
+    assert_eq!(v_session(chain(999)), Err("'type".to_string()));
+    assert!(too_long(v_session(chain(1000))));
     // bracket nesting counts as nesting: 127 deep is fine, 128 is not
     let nested = |k: usize| format!("{}0{}", "v[".repeat(k), "]".repeat(k));
     assert_eq!(v_session(nested(127)), Ok("0".to_string()));

@@ -174,8 +174,9 @@ fn lex_lists_parser_evaluates_literals() {
     for src in ["1 \"ab\"", "1 `a", "1+`a 1"] {
         assert_eq!(eval_err(src), QError::Type, "{src}");
     }
-    for src in ["\"ab\" 1", "101b 1"] {
-        assert!(Interpreter::new().eval_line(src).is_ok(), "{src}");
+    for (src, want) in [("\"ab\" 1", "\"b\""), ("101b 1", "0b")] {
+        let got = Interpreter::new().eval_line(src).unwrap().unwrap();
+        assert_eq!(got.to_string(), want, "{src}");
     }
 }
 

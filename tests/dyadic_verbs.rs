@@ -83,9 +83,10 @@ fn verbs_negative_literals_after_each_verb() {
     assert_eq!(show("1 < -2"), "0b");
     assert_eq!(show("1 2 3 > -1 5 -3"), "101b");
     // after # , ! the negative literal still lexes as a number
-    for (src, sym) in [("1#-2", "#"), ("1,-2", ","), ("1!-2", "!")] {
-        assert_ne!(err(src), format!("'parse: unexpected {sym}"), "{src}");
-    }
+    assert_eq!(show("1#-2"), ",-2");
+    assert_eq!(show("1,-2"), "1 -2");
+    assert_eq!(show("-2#1 2 3"), "2 3");
+    assert_eq!(err("1!-2"), "'nyi: !");
 }
 
 #[test]
@@ -213,6 +214,25 @@ fn verbs_take_join_key_reach_their_kernels() {
 }
 
 #[test]
+fn verbs_take_join_key_real_results() {
+    assert_eq!(show("2#1 2 3"), "1 2");
+    assert_eq!(show("5#1 2"), "1 2 1 2 1");
+    assert_eq!(show("1 2,3 4"), "1 2 3 4");
+    assert_eq!(show("1 2,3"), "1 2 3");
+    assert_eq!(show("\"ab\",\"c\""), "\"abc\"");
+    // right to left: 2 # (1 2 3 + 1), and a join feeding a comparison
+    assert_eq!(show("2#1 2 3 + 1"), "2 3");
+    assert_eq!(show("(1 2,3) = 1 2 4"), "110b");
+    assert_eq!(show("1 2,3 = 3"), "1\n2\n1b");
+    // each verb is wired to its own token: an undefined right operand is reported by the evaluator
+    for src in ["1#u", "1,u", "1!u"] {
+        assert_eq!(err(src), "'u (Undefined variable)", "{src}");
+    }
+    assert_eq!(err("1!2"), "'nyi: !");
+    assert_eq!(err("1 2!3 4"), "'nyi: !");
+}
+
+#[test]
 fn verbs_other_punctuation_is_still_nyi() {
     assert_eq!(eval("1 $ 2"), Err(QError::Nyi("$".into())));
     assert_eq!(eval("1 @ 2"), Err(QError::Nyi("@".into())));
@@ -229,10 +249,11 @@ fn verbs_chain_limit_holds_for_new_verbs() {
         .unwrap()
         .join()
         .unwrap();
-    assert_eq!(e, Err("'parse: expression too long".to_string()));
+    assert!(e.unwrap_err().starts_with("'parse: expression too long"));
     // mixed verbs count toward the same cap
     let mixed = format!("{}1", "1<1+".repeat(1500));
-    assert_eq!(eval(&mixed), Err(QError::parse("expression too long")));
+    let err = eval(&mixed).unwrap_err().to_string();
+    assert!(err.starts_with("'parse: expression too long"), "{err}");
 }
 
 #[test]

@@ -22,7 +22,7 @@ OxideDB provides an interactive environment where you can:
 - Execute O expressions immediately
 - Define variables and reuse their values
 
-Vector literals and vector arithmetic work (Chapter 3). Tables and queries are still to come.
+Vector literals, vector arithmetic, comparisons, `til`, `count`, `neg`, indexing, take (`#`) and join (`,`) work (Chapter 3). Tables and queries are still to come.
 
 ## Getting Started
 

@@ -584,3 +584,22 @@ proptest! {
         }
     }
 }
+
+#[test]
+fn cmp_length_is_checked_before_type() {
+    for verb in CMP {
+        assert_eq!(
+            dyad(verb, &lv(&[1, 2, 3]), &sv(&["a", "b"])),
+            Err(QError::Length)
+        );
+        assert_eq!(dyad(verb, &lv(&[1, 2, 3]), &cv("ab")), Err(QError::Length));
+        assert_eq!(
+            dyad(verb, &sv(&["a", "b", "c"]), &sv(&["a", "b"])),
+            Err(QError::Length)
+        );
+        assert_eq!(
+            dyad(verb, &lv(&[1, 2]), &sv(&["a", "b"])),
+            Err(QError::Type)
+        );
+    }
+}

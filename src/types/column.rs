@@ -2,7 +2,9 @@ use super::atom::{float_eq, Atom};
 use super::sym::Sym;
 use crate::error::{QError, QResult};
 
-/// Largest vector a single operation (`til`, `take`) may build: 80 MB of longs.
+/// Largest element count a single operation (`til`, take, join) may produce.
+/// It bounds elements, not bytes: 80 MB of longs, but a general-list result
+/// costs several times more per element.
 pub const MAX_ELEMS: usize = 10_000_000;
 
 /// Validate a requested element count: `0..=MAX_ELEMS`, else `'domain`.

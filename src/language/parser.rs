@@ -1,6 +1,7 @@
 use crate::error::{QError, QResult};
 use crate::language::{
     ast::{Expr, UnaryOperator, Verb},
+    builtins,
     lexer::Token,
 };
 use crate::types::atom::Atom;
@@ -35,6 +36,14 @@ fn nyi_token(token: &Token) -> Option<QError> {
         _ => return None,
     };
     Some(QError::Nyi(detail))
+}
+
+/// A builtin name belongs to the language (q reserves them too).
+fn assignable(name: &str) -> QResult<()> {
+    if builtins::lookup(name).is_some() {
+        return Err(QError::parse(format!("cannot assign to builtin {name}")));
+    }
+    Ok(())
 }
 
 /// What sits between two operands of a chain.
@@ -88,12 +97,21 @@ pub struct Parser {
     tokens: Vec<Token>,
     current: usize,
     depth: usize,
+    /// Expressions and operator joins parsed so far on this line (see `MAX_BUDGET`).
+    spent: usize,
 }
 
 /// Maximum nesting of parentheses / monadic minus.
 const MAX_DEPTH: usize = 128;
-/// Maximum operators in one flat chain (`1+1+...`); evaluate and drop recurse over it.
-const MAX_CHAIN: usize = 2_000;
+/// One budget per line, shared by every nesting level: each (sub)expression (nesting levels,
+/// unary minus and assignment values included) and each operator join spends one. The
+/// right-nested AST that evaluate and drop recurse over is therefore at most this deep,
+/// however the line mixes chains and nesting; assignment nesting is also capped by `MAX_DEPTH`.
+/// A flat chain may hold 1,999 operators (the line itself spends one). Measured worst case at
+/// the budget (an application chain `count count ... 1`): about 4.5 MB in a debug build, 1.4 MB in
+/// release (operator chains: 2.9 MB and 0.7 MB). Evaluate lines on a thread with at least 6 MB in
+/// debug builds (2 MB in release); the binary uses a dedicated 64 MB thread.
+const MAX_BUDGET: usize = 2_000;
 
 impl Parser {
     pub fn new(mut tokens: Vec<Token>) -> Self {
@@ -104,6 +122,7 @@ impl Parser {
             tokens,
             current: 0,
             depth: 0,
+            spent: 0,
         }
     }
 
@@ -121,7 +140,18 @@ impl Parser {
         Ok(expr)
     }
 
+    fn spend(&mut self) -> QResult<()> {
+        self.spent += 1;
+        if self.spent > MAX_BUDGET {
+            return Err(QError::parse(format!(
+                "expression too long (a line may hold at most {MAX_BUDGET} operators and sub-expressions)"
+            )));
+        }
+        Ok(())
+    }
+
     fn expression(&mut self) -> QResult<Expr> {
+        self.spend()?;
         if self.depth >= MAX_DEPTH {
             return Err(QError::parse("expression nested too deeply"));
         }
@@ -137,16 +167,13 @@ impl Parser {
         // Check if this is an assignment (symbol followed by colon)
         if let Expr::Symbol(name) = &expr {
             if self.match_tokens(&[Token::Colon]) {
+                assignable(name)?;
                 let value = self.expression()?;
                 return Ok(Expr::Assignment {
                     name: name.clone(),
                     value: Box::new(value),
                 });
             }
-        }
-
-        if matches!(expr, Expr::Apply { .. }) && self.check(&Token::Colon) {
-            return Err(QError::Nyi("index assignment".into()));
         }
 
         Ok(expr)
@@ -159,9 +186,14 @@ impl Parser {
         let mut joins = Vec::new();
         loop {
             let mut operand = self.unary()?;
+            // `v[0]:5`, wherever it stands in the chain.
+            if matches!(operand, Expr::Apply { .. }) && self.check(&Token::Colon) {
+                return Err(QError::Nyi("index assignment".into()));
+            }
             // An assignment in operand position (`x+y:2`) takes the rest of the input.
             if let (false, Expr::Symbol(name)) = (operands.is_empty(), &operand) {
                 if self.match_tokens(&[Token::Colon]) {
+                    assignable(name)?;
                     let name = name.clone();
                     let value = self.expression()?;
                     operand = Expr::Assignment {
@@ -183,9 +215,7 @@ impl Parser {
             };
             joins.push(join);
             // The AST is still a right-nested tree, which evaluate and drop recurse over.
-            if joins.len() >= MAX_CHAIN {
-                return Err(QError::parse("expression too long"));
-            }
+            self.spend()?;
         }
         let mut right = operands.pop().expect("at least one operand");
         while let Some(join) = joins.pop() {
@@ -221,12 +251,9 @@ impl Parser {
     /// A noun and any `[...]` after it (`v[0 2][1]`); brackets bind tighter than juxtaposition.
     fn primary(&mut self) -> QResult<Expr> {
         let mut term = self.noun()?;
-        let mut links = 0;
         while self.match_tokens(&[Token::LeftBracket]) {
-            links += 1;
-            if links >= MAX_CHAIN {
-                return Err(QError::parse("expression too long"));
-            }
+            // Each link deepens the left-nested function spine evaluate recurses over.
+            self.spend()?;
             let args = self.bracket_args()?;
             term = Expr::Apply {
                 func: Box::new(term),
