@@ -1,7 +1,7 @@
 // Chapter 3: Vectors and Lists Examples
 // Vector literals: longs, floats, booleans, symbols and strings, and arithmetic on them
-// Lines whose expected output starts with a quote are errors: `cargo run` stops at the first one,
-// while `cargo test --test book_examples` checks every line.
+// Lines whose result starts with a quote are errors. `cargo run` stops at the first one;
+// the book test runs every line.
 
 // Long vectors
 // Expected output: 1 2 3
