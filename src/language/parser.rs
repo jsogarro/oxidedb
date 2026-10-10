@@ -1,6 +1,7 @@
 use crate::error::{QError, QResult};
 use crate::language::{
     ast::{Expr, UnaryOperator, Verb},
+    builtins,
     lexer::Token,
 };
 use crate::types::atom::Atom;
@@ -35,6 +36,20 @@ fn nyi_token(token: &Token) -> Option<QError> {
         _ => return None,
     };
     Some(QError::Nyi(detail))
+}
+
+/// A builtin name belongs to the language (q reserves them too).
+fn assignable(name: &str) -> QResult<()> {
+    if builtins::lookup(name).is_some() {
+        return Err(QError::parse(format!("cannot assign to builtin {name}")));
+    }
+    Ok(())
+}
+
+/// What sits between two operands of a chain.
+enum Join {
+    Verb(Verb),
+    Apply,
 }
 
 /// The binary verb a token spells, if any.
@@ -92,9 +107,10 @@ const MAX_DEPTH: usize = 128;
 /// unary minus and assignment values included) and each operator join spends one. The
 /// right-nested AST that evaluate and drop recurse over is therefore at most this deep,
 /// however the line mixes chains and nesting; assignment nesting is also capped by `MAX_DEPTH`.
-/// A flat chain may hold 1,999 operators (the line itself spends one). Evaluate lines on a
-/// thread with at least 4 MB of stack in debug builds (under 1 MB in release); the binary uses
-/// a dedicated 64 MB thread.
+/// A flat chain may hold 1,999 operators (the line itself spends one). Measured worst case at
+/// the budget (an application chain `count count ... 1`): about 4.5 MB in a debug build, 1.4 MB in
+/// release (operator chains: 2.9 MB and 0.7 MB). Evaluate lines on a thread with at least 6 MB in
+/// debug builds (2 MB in release); the binary uses a dedicated 64 MB thread.
 const MAX_BUDGET: usize = 2_000;
 
 impl Parser {
@@ -151,6 +167,7 @@ impl Parser {
         // Check if this is an assignment (symbol followed by colon)
         if let Expr::Symbol(name) = &expr {
             if self.match_tokens(&[Token::Colon]) {
+                assignable(name)?;
                 let value = self.expression()?;
                 return Ok(Expr::Assignment {
                     name: name.clone(),
@@ -166,12 +183,17 @@ impl Parser {
         // Parsed iteratively so a long flat chain does not consume parser depth;
         // folded from the right into the same right-associative AST.
         let mut operands = Vec::new();
-        let mut operators = Vec::new();
+        let mut joins = Vec::new();
         loop {
             let mut operand = self.unary()?;
+            // `v[0]:5`, wherever it stands in the chain.
+            if matches!(operand, Expr::Apply { .. }) && self.check(&Token::Colon) {
+                return Err(QError::Nyi("index assignment".into()));
+            }
             // An assignment in operand position (`x+y:2`) takes the rest of the input.
             if let (false, Expr::Symbol(name)) = (operands.is_empty(), &operand) {
                 if self.match_tokens(&[Token::Colon]) {
+                    assignable(name)?;
                     let name = name.clone();
                     let value = self.expression()?;
                     operand = Expr::Assignment {
@@ -180,26 +202,34 @@ impl Parser {
                     };
                 }
             }
-            // A noun straight after a noun is application (`x 1`, `1 "a"`), not built yet.
-            if starts_noun(self.peek()) {
-                return Err(QError::Nyi("application".into()));
-            }
             operands.push(operand);
-            let Some(verb) = verb_of(self.peek()) else {
+            // A verb joins two operands; a noun straight after a noun is application.
+            // Both fold from the right, so `v 0 + 1` is `v (0 + 1)`.
+            let join = if let Some(verb) = verb_of(self.peek()) {
+                self.advance();
+                Join::Verb(verb)
+            } else if starts_noun(self.peek()) {
+                Join::Apply
+            } else {
                 break;
             };
-            self.advance();
-            operators.push(verb);
+            joins.push(join);
             // The AST is still a right-nested tree, which evaluate and drop recurse over.
             self.spend()?;
         }
         let mut right = operands.pop().expect("at least one operand");
-        while let Some(operator) = operators.pop() {
-            let left = operands.pop().expect("operand per operator");
-            right = Expr::BinaryOp {
-                left: Box::new(left),
-                operator,
-                right: Box::new(right),
+        while let Some(join) = joins.pop() {
+            let left = Box::new(operands.pop().expect("operand per join"));
+            right = match join {
+                Join::Verb(operator) => Expr::BinaryOp {
+                    left,
+                    operator,
+                    right: Box::new(right),
+                },
+                Join::Apply => Expr::Apply {
+                    func: left,
+                    args: vec![right],
+                },
             };
         }
         Ok(right)
@@ -218,7 +248,43 @@ impl Parser {
         self.primary()
     }
 
+    /// A noun and any `[...]` after it (`v[0 2][1]`); brackets bind tighter than juxtaposition.
     fn primary(&mut self) -> QResult<Expr> {
+        let mut term = self.noun()?;
+        while self.match_tokens(&[Token::LeftBracket]) {
+            // Each link deepens the left-nested function spine evaluate recurses over.
+            self.spend()?;
+            let args = self.bracket_args()?;
+            term = Expr::Apply {
+                func: Box::new(term),
+                args,
+            };
+        }
+        Ok(term)
+    }
+
+    /// Arguments up to the closing `]`, separated by `;`; the `[` is already read.
+    fn bracket_args(&mut self) -> QResult<Vec<Expr>> {
+        let mut args = Vec::new();
+        if self.match_tokens(&[Token::RightBracket]) {
+            return Ok(args);
+        }
+        loop {
+            if self.check(&Token::Semicolon) || self.check(&Token::RightBracket) {
+                return Err(QError::Nyi("elided argument".into()));
+            }
+            args.push(self.expression()?);
+            if self.match_tokens(&[Token::RightBracket]) {
+                return Ok(args);
+            }
+            if !self.match_tokens(&[Token::Semicolon]) {
+                return Err(nyi_token(self.peek())
+                    .unwrap_or_else(|| QError::parse("expected ']' after arguments")));
+            }
+        }
+    }
+
+    fn noun(&mut self) -> QResult<Expr> {
         if self.is_at_end() {
             return Err(QError::parse("unexpected end of input"));
         }

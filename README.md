@@ -76,6 +76,7 @@ Phase 1 of the O language implementation is **complete** with a fully functional
 - ✅ **Atom Types**: Integers, floats, booleans, characters and symbols with q-style type codes
 - ✅ **Vector Literals**: long, float, boolean, symbol and character vectors (strings)
 - ✅ **Vector Arithmetic**: `+ - * %` item by item, with broadcasting of atoms
+- ✅ **Application and indexing**: `til 3+2`, `count til 5`, `v[1]`, `v 0 2`, with q's right-to-left argument rule
 - ✅ **Take and join**: `2#1 2 3` is `1 2`, `1 2,3 4` is `1 2 3 4`
 - ✅ **Comparison**: `= <> < <= > >=` on atoms and vectors (`1 2 3 = 1 5 3` is `101b`)
 - ✅ **Interactive REPL**: Full-featured environment with command history and error handling
@@ -94,9 +95,10 @@ Phase 1 of the O language implementation is **complete** with a fully functional
 
 #### Phase 2: Vectors and Lists (book Chapter 3) 🚧 **IN PROGRESS**
 - ✅ Vector literals (`1 2 3`, `1 2.5 3`, `101b`, `` `a`b ``, `"abc"`), symbol atoms and vector arithmetic
+- ✅ `til`, `count` and `neg`
 - ✅ Take and join (`#`, `,`)
-- ⏳ `til` and `count`
-- ⏳ Indexing and slicing
+- ✅ Indexing (`v[i]`, `v i`, `v[0 2]`; out of range gives a null)
+- ⏳ Slicing and item assignment
 - ✅ Vector arithmetic (`+ - * %` on atoms and vectors)
 - ✅ Comparison verbs in the language (`= <> < <= > >=`, giving booleans and boolean vectors)
 - ⏳ Type-preserving operations
@@ -145,6 +147,12 @@ oxidedb> 1 2 3 + 10   // Arithmetic applies to every item
 11 12 13
 oxidedb> 1 2 3 = 1 5 3   // Comparison gives a boolean vector
 101b
+oxidedb> v:til 3+2       // A name applies to everything on its right
+0 1 2 3 4
+oxidedb> v 0 2           // Indexing
+0 2
+oxidedb> v[9]            // Out of range is a null, not an error
+0N
 oxidedb> 5#1 2           // Take wraps around
 1 2 1 2 1
 oxidedb> 1 2,3 4        // Join
@@ -171,7 +179,7 @@ Complete guide to the O programming language located in `/book/`:
 - **Introduction**: Overview of O and OxideDB
 - **Chapter 1**: Atoms and Basic Arithmetic
 - **Chapter 2**: Variables and Assignment
-- **Chapter 3**: Vectors and Lists (in progress: vector literals, arithmetic, comparison, take and join)
+- **Chapter 3**: Vectors and Lists (in progress: vector literals, arithmetic, comparison, `til`, `count`, indexing, take and join)
 
 ### Executable Examples
 Run interactive examples from the book:

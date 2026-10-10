@@ -132,6 +132,66 @@ fn every_verb_spends_from_the_budget() {
     assert!(run_child(&format!("{}1", "1,".repeat(1999)), 8192).is_ok());
 }
 
+/// Not rejected: the line parses, and evaluating `1 2 3[0][0]...` is a plain `'type`.
+fn assert_parses(src: &str) {
+    assert_eq!(run_child(src, 8192), Err("'type".to_string()), "{src:.60}");
+}
+
+#[test]
+fn application_and_bracket_links_spend_from_the_budget() {
+    // juxtaposition: flat boundary (the line spends one, each join one) ...
+    assert_eq!(
+        run_child(&format!("{}1", "count ".repeat(1999)), 8192).unwrap(),
+        "1"
+    );
+    assert!(run_child(&format!("{}1", "count ".repeat(2000)), 8192)
+        .unwrap_err()
+        .contains("too long"));
+    // ... and nested 127 levels deep, each opened after a long chain
+    let level = format!("{}(", "count ".repeat(217));
+    assert_rejected(&format!("{}1{}", level.repeat(127), ")".repeat(127)));
+    // brackets: a suffix spends a link plus its argument expression, so 1 + 2k <= 2000
+    assert_parses(&format!("1 2 3{}", "[0]".repeat(999)));
+    assert!(run_child(&format!("1 2 3{}", "[0]".repeat(1000)), 8192)
+        .unwrap_err()
+        .contains("too long"));
+    // the abort shapes: chains and suffix links nested 127 levels deep
+    assert_rejected(&format!(
+        "{}1{}",
+        ("count ".repeat(147) + "(").repeat(127),
+        ")".repeat(127)
+    ));
+    assert_rejected(&format!(
+        "{}0{}",
+        ("1+".repeat(146) + "v[").repeat(127),
+        "]".repeat(127)
+    ));
+    assert_rejected(&format!(
+        "{}v{}",
+        "(".repeat(127),
+        (")".to_string() + &"[0 1 2]".repeat(147)).repeat(127)
+    ));
+    // `v[ v[ ... ][0][0]... ][0][0]...`: suffix links hung off the first argument of every level
+    let spine = |k: usize| {
+        format!(
+            "{}0{}",
+            "v[".repeat(127),
+            ("]".to_string() + &"[0]".repeat(k)).repeat(127)
+        )
+    };
+    assert_rejected(&spine(146));
+    assert_rejected(&spine(8));
+    // under the budget the same shape still parses (127 * (2 + 2k) + 1 <= 2000 for k = 6)
+    assert_parses(&spine(6).replace("v[", "1 2 3["));
+    // bracket arguments go through `expression()`: nesting is capped at 128 levels
+    assert!(run_child(
+        &format!("{}0{}", "1 2 3[".repeat(128), "]".repeat(128)),
+        8192
+    )
+    .unwrap_err()
+    .contains("nested too deeply"));
+}
+
 #[test]
 fn leading_minus_variant_is_rejected() {
     for (levels, terms) in [(127, 217), (32, 858)] {
@@ -207,6 +267,13 @@ fn budget_boundary_is_pinned() {
         .contains("too long"));
     assert!(run_child(&sib(995, 996, "1+a:"), 8192).is_ok());
     assert!(run_child(&sib(996, 996, "1+a:"), 8192)
+        .unwrap_err()
+        .contains("too long"));
+    // Siblings made of bracket suffixes share the budget as well: 1 + 2a + 1 join + 2b <= 2000.
+    let suffixes =
+        |a: usize, b: usize| format!("1 2 3{}+1 2 3{}", "[0]".repeat(a), "[0]".repeat(b));
+    assert_parses(&suffixes(500, 499));
+    assert!(run_child(&suffixes(500, 500), 8192)
         .unwrap_err()
         .contains("too long"));
     // Unary minus spends too: each `- ` is a nested expression.

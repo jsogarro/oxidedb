@@ -170,9 +170,13 @@ fn lex_lists_parser_evaluates_literals() {
     ] {
         assert!(Interpreter::new().eval_line(src).is_ok(), "{src}");
     }
-    let nyi = QError::Nyi("application".into());
-    for src in ["1 \"ab\"", "\"ab\" 1", "1 `a", "1+`a 1", "101b 1"] {
-        assert_eq!(eval_err(src), nyi, "{src}");
+    // application: an atom cannot be applied
+    for src in ["1 \"ab\"", "1 `a", "1+`a 1"] {
+        assert_eq!(eval_err(src), QError::Type, "{src}");
+    }
+    for (src, want) in [("\"ab\" 1", "\"b\""), ("101b 1", "0b")] {
+        let got = Interpreter::new().eval_line(src).unwrap().unwrap();
+        assert_eq!(got.to_string(), want, "{src}");
     }
 }
 

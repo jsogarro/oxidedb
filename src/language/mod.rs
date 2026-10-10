@@ -1,3 +1,4 @@
+pub mod apply;
 pub mod ast;
 pub mod builtins;
 pub mod interpreter;

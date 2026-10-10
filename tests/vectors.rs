@@ -107,21 +107,15 @@ fn vec_lit_bool() {
 
 #[test]
 fn vec_lit_booleans_do_not_join_runs() {
-    // Juxtaposed nouns are application, whatever their kind.
-    let nyi = Err(QError::Nyi("application".into()));
+    // Juxtaposed nouns are application, whatever their kind: an atom cannot be
+    // applied, a vector is indexed (a boolean index reads as 0 or 1).
     for src in [
-        "1 1b",
-        "1b 1",
-        "1b 0b",
-        "1 2 1b",
-        "1b 2 3",
-        "1.5 1b",
-        "1b 2.5",
-        "1 101b",
-        "101b 010b",
+        "1 1b", "1b 1", "1b 0b", "1b 2 3", "1.5 1b", "1b 2.5", "1 101b",
     ] {
-        assert_eq!(eval(src), nyi, "{src}");
+        assert_eq!(eval(src), Err(QError::Type), "{src}");
     }
+    assert_eq!(show("1 2 1b"), "2");
+    assert_eq!(show("101b 010b"), "101b");
 }
 
 #[test]
@@ -223,39 +217,37 @@ fn vec_lit_float_suffix_only_on_the_last_item() {
 }
 
 #[test]
-fn vec_lit_mixed_kinds_are_application_nyi() {
-    let nyi = Err(QError::Nyi("application".into()));
+fn vec_lit_mixed_kinds_are_application() {
+    // an atom, or a vector indexed by something that is not a long or boolean, is a type error
     for src in [
         "1 \"a\"",
         "1 `a",
-        "\"ab\" 1",
-        "x 1 2",
-        "1 2 x",
-        "x y",
-        "1 x",
         "`a 1",
         "\"a\" \"b\"",
         "`a `b",
         "1 2 \"ab\"",
-        "101b 1",
-        "x 1.5",
         "\"a\" 1.5",
-        "x 1b",
-        "\"ab\" 0b",
         "1 `a`b",
-        "x `a`b",
-        "x 101b",
-        "\"ab\" 101b",
-        "x \"ab\"",
         "1 (2)",
-        "x (1)",
     ] {
-        assert_eq!(eval(src), nyi, "{src}");
+        assert_eq!(eval(src), Err(QError::Type), "{src}");
     }
+    // an undefined name is reported once the argument has been evaluated
+    for src in [
+        "x 1 2", "1 2 x", "1 x", "x 1.5", "x 1b", "x `a`b", "x 101b", "x \"ab\"", "x (1)",
+    ] {
+        assert_eq!(eval(src), Err(QError::Undefined("x".into())), "{src}");
+    }
+    assert_eq!(eval("x y"), Err(QError::Undefined("y".into())));
+    // a vector indexed by a long or boolean vector
+    assert_eq!(show("\"ab\" 1"), "\"b\"");
+    assert_eq!(show("101b 1"), "0b");
+    assert_eq!(show("\"ab\" 0b"), "\"a\"");
+    assert_eq!(show("\"ab\" 101b"), "\"bab\"");
 }
 
 #[test]
-fn vec_lit_application_nyi_does_not_swallow_other_errors() {
+fn vec_lit_application_does_not_swallow_other_errors() {
     assert_eq!(eval("1 +"), Err(QError::parse("unexpected end of input")));
     assert_eq!(
         eval("1 2 3)"),

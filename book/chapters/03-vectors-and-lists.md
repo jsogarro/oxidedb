@@ -1,6 +1,6 @@
 # Chapter 3: Vectors and Lists
 
-So far every value has been a single atom. Real data comes in bunches: a week of temperatures, a column of prices, the names of your customers. O is an array language, so a list of values is as easy to write as a single one, and later chapters build tables and queries out of such lists. This chapter is in progress: it covers how to write vectors, store them, compute with them and compare them, and ends with a list of what is still to come.
+So far every value has been a single atom. Real data comes in bunches: a week of temperatures, a column of prices, the names of your customers. O is an array language, so a list of values is as easy to write as a single one, and later chapters build tables and queries out of such lists. This chapter is in progress: it covers how to write vectors, store them, compute with them, compare them and pick items out of them, and ends with a list of what is still to come.
 
 ## Why Vectors?
 
@@ -47,12 +47,12 @@ oxidedb> 101b
 oxidedb> 00b
 00b
 ```
-A single `1b` or `0b` is still a boolean atom. Booleans in a list are written glued together as one token: `101b`, not `1b 0b 1b`. Separate booleans (or a boolean and a number) side by side are not a list; see Unfinished Business below. Booleans do take part in arithmetic, as `0` and `1` (see below).
+A single `1b` or `0b` is still a boolean atom. Booleans in a list are written glued together as one token: `101b`, not `1b 0b 1b`. Separate booleans (or a boolean and a number) side by side are not a list; they are two values side by side, which O reads as application (see Indexing below). Booleans do take part in arithmetic, as `0` and `1` (see below).
 ```
 oxidedb> 1b
 1b
 oxidedb> 1b 0b
-'nyi: application
+'type
 ```
 
 ### Symbols
@@ -65,7 +65,7 @@ oxidedb> `
 oxidedb> `a`b`c
 `a`b`c
 ```
-Symbol names use letters, digits, `_` and `.`. Write the symbols of a vector with no spaces between the backticks: two symbols with a space between them, `` `a `b ``, are two values side by side, which O reads as application (see Unfinished Business below), not as a vector.
+Symbol names use letters, digits, `_` and `.`. Write the symbols of a vector with no spaces between the backticks: two symbols with a space between them, `` `a `b ``, are two values side by side, which O reads as application (see Indexing below), not as a vector.
 
 ### Strings are lists of characters
 A string is a list of characters, so `"abc"` is a character vector. In Chapter 1 we saw that one character in quotes is an atom; two or more make a vector, and empty quotes make the empty character vector:
@@ -112,16 +112,16 @@ oxidedb> -1 2 3
 oxidedb> 2*-1
 -2
 ```
-The most common trap is a variable. With `x:5`, `x -1` is **not** subtraction: a name is a value too, so it is two values side by side, and O reports `'nyi: application` (q would apply `x` to `-1`). `x - 1` and `x-1` subtract:
+The most common trap is a variable. With `x:1 2 3`, `x -1` is **not** subtraction: a name is a value too, so `x -1` is two values side by side, and a value followed by a value is application. Here that means indexing `x` with `-1`, which is out of range, so the answer is a null (Indexing below explains why). `x - 1` and `x-1` subtract:
 ```
-oxidedb> x:5
-5
+oxidedb> x:1 2 3
+1 2 3
 oxidedb> x -1
-'nyi: application
+0N
 oxidedb> x - 1
-4
+0 1 2
 oxidedb> x-1
-4
+0 1 2
 ```
 When in doubt, put spaces around the minus you mean as an operator.
 
@@ -236,25 +236,38 @@ oxidedb> "abc" + 1
 ```
 
 ### Negating a vector
-A minus with a space after it is O's leading minus, applied to everything on its right (q would write `neg 1 2 3`). Glued to the digit it is part of the first number:
+A minus with a space after it is O's leading minus, applied to everything on its right. Glued to the digit it is part of the first number:
 ```
 oxidedb> - 1 2 3
 -1 -2 -3
 oxidedb> -1 2 3
 -1 2 3
 ```
+q has no leading minus on an expression. It negates with the keyword `neg`, and so does O: `neg` is a function, so it takes everything to its right in the same way (see `til` and `count` below for how a name is applied). It works on atoms, booleans and vectors, and a null stays a null. (`neg 1b` is `-1i` in q, an int; O has no int type, so its result is the long `-1`.)
+```
+oxidedb> neg 5
+-5
+oxidedb> neg 1 2 3
+-1 -2 -3
+oxidedb> neg 1b
+-1
+oxidedb> neg 0N
+0N
+oxidedb> 1 + neg 2
+-1
+oxidedb> neg 1 + 2
+-3
+```
 
 ### The negative-literal trap, with arithmetic
-`2 -1 + 1` is the two-item vector `2 -1` plus 1. With a variable the same spelling is application, not subtraction:
+`2 -1 + 1` is the two-item vector `2 -1` plus 1. With a variable the same spelling is application, not subtraction, and application takes everything to its right, so `x -1 + 1` is `x (-1 + 1)`, which is `x 0`:
 ```
 oxidedb> 2 -1 + 1
 3 0
 oxidedb> 2 - 1 + 1
 0
-oxidedb> x:5
-5
 oxidedb> x -1 + 1
-'nyi: application
+1
 ```
 
 ### Variables in arithmetic
@@ -368,6 +381,144 @@ Sums of halves and quarters are exact in binary, so that last one is true.
 
 You may be tempted to count how many items match, for example how many entries of `v>1` are true. That needs a way to add up a vector, which does not exist yet, so for now the boolean vector is the answer.
 
+## `til` and `count`
+
+Two named functions come with O. `til n` makes the vector `0 1 ... n-1`, and `count x` is the number of items in `x`. You apply a name by writing it before its argument:
+```
+oxidedb> til 5
+0 1 2 3 4
+oxidedb> count 1 2 3
+3
+oxidedb> count "hello"
+5
+oxidedb> count 7
+1
+```
+A function takes **everything to its right** as its argument, which is the right-to-left rule again. `til 3+2` is `til 5`, not `(til 3) + 2`, and functions chain without parentheses:
+```
+oxidedb> til 3+2
+0 1 2 3 4
+oxidedb> (til 3) + 2
+2 3 4
+oxidedb> count til 5
+5
+oxidedb> count til 3 + 2
+5
+oxidedb> 10 * til 3
+0 10 20
+```
+The argument can also go in square brackets, `til[5]`, which is the same thing written the way you write a call with several arguments. A function that wants one argument is a `'rank` error with two or none. `til` of a negative number or the null is a `'domain` error, and of anything but a long a `'type` error:
+```
+oxidedb> til[5]
+0 1 2 3 4
+oxidedb> til[1;2]
+'rank
+oxidedb> til -1
+'domain
+oxidedb> til 2.5
+'type
+oxidedb> til[]
+'rank
+```
+(In q, `til 1b` is `,0` and `til[]` passes a null argument; O reports `'type` and `'rank`.) A name like `til` belongs to the language, so you cannot assign to it, and on its own it is not yet a value you can print:
+```
+oxidedb> til:3
+'parse: cannot assign to builtin til
+oxidedb> til
+'nyi: til as a value
+```
+
+## Indexing
+
+A vector is applied to an index to get items out of it. Counting starts at 0. You can write the index in brackets or put it after the name; a single index gives an item, and a vector of indexes gives a vector of items:
+```
+oxidedb> v:10 20 30
+10 20 30
+oxidedb> v[1]
+20
+oxidedb> v 1
+20
+oxidedb> v[0 2]
+10 30
+oxidedb> v 0 2
+10 30
+oxidedb> v[til 3]
+10 20 30
+oxidedb> i:2
+2
+oxidedb> v i
+30
+```
+The result has one item for each index, in the order you asked, and indexes can repeat: `v[2 1 0 0]` is `30 20 10 10`. Strings and symbol vectors index the same way:
+```
+oxidedb> "abc" 1
+"b"
+oxidedb> "abc" 0 2
+"ac"
+oxidedb> `a`b`c 2
+`c
+```
+
+### Out of range is a null
+An index past the end gives the null of the vector's type, not an error. A negative index is also out of range; O does not count from the end:
+```
+oxidedb> v[5]
+0N
+oxidedb> v[3]
+0N
+oxidedb> v[-1]
+0N
+oxidedb> v[1 5]
+20 0N
+oxidedb> `a`b[5]
+`
+oxidedb> "abc"[5]
+" "
+oxidedb> 1.5 2.5[5]
+0n
+oxidedb> 101b[7]
+0b
+```
+Each type has its own null: `0N` for longs, `0n` for floats, the null symbol, a blank for characters and `0b` for booleans (there is no boolean null).
+
+### Brackets, juxtaposition and right to left
+Square brackets bind tighter than anything else, so `v[0] + 1` is `(v[0]) + 1`, while `v 0 + 1` is `v (0 + 1)`, because a name written before a value applies to everything on its right. Brackets can be chained, and what a bracket returns can be indexed again:
+```
+oxidedb> v[0] + 1
+11
+oxidedb> v 0 + 1
+20
+oxidedb> v[0 2][1]
+30
+oxidedb> v[1 > 10]
+10
+```
+The last line is `v[0b]`: a boolean index counts as 0 or 1, so a comparison on the right of a name is easy to misread. When the index is an expression, put it in brackets.
+
+The argument is evaluated before the vector it indexes, as with every right-to-left rule, so an assignment inside the brackets is done first:
+```
+oxidedb> v[j:1]
+20
+oxidedb> j
+1
+```
+
+### What cannot be indexed
+The index must be a long or a boolean (or a vector of them); a float, symbol or character index is a `'type` error. An atom cannot be indexed either: `x 1` with `x:5` is a `'type` error (q treats a number applied to an argument as a file handle, which O does not imitate). A single index is all a vector takes; more is a `'rank` error (q says `'type`). Empty brackets give the vector back:
+```
+oxidedb> v[1.0]
+'type
+oxidedb> x:5
+5
+oxidedb> x 1
+'type
+oxidedb> v[0;1]
+'rank
+oxidedb> v[]
+10 20 30
+```
+Assigning to an item (`v[0]:5`) is not supported yet.
+
 ## Take (`#`)
 
 `n # v` takes the first `n` items of `v`. The count goes on the left, the list on the right:
@@ -465,19 +616,8 @@ oxidedb> (1 2,3) = 1 2 4
 
 ## Unfinished Business
 
-Three things that look like they should work are not supported yet. Each gives a clear error rather than a wrong answer.
+Two things that look like they should work are not supported yet. Each gives a clear error rather than a wrong answer.
 
-Two values side by side that do not form a literal vector are, in q, the left one applied to the right one: indexing a list or calling a function. That means any two nouns, of the same kind or not: `1 "a"`, `` `a `b ``, `"ab" "cd"`, `(1 2) 3`, `x 1 2` and `1b 0b`. It arrives with indexing:
-```
-oxidedb> 1 "a"
-'nyi: application
-oxidedb> `a `b
-'nyi: application
-oxidedb> (1 2) 3
-'nyi: application
-oxidedb> x 1 2
-'nyi: application
-```
 General lists, written with parentheses and semicolons, are not built yet:
 ```
 oxidedb> (1;2;3)
@@ -493,10 +633,10 @@ oxidedb> 1 2 3/2
 
 These parts of the chapter will be added as the features arrive. None of them work yet, so there are no samples for them:
 
-- `til` and `count`
-- indexing a vector
 - general (mixed or nested) lists, written with parentheses and semicolons
-- assigning to an item of a vector
+- assigning to an item of a vector (`v[0]:5`)
+- several statements on one line, separated by `;`
+- adverbs and functions
 
 ## Exercises
 
@@ -509,6 +649,15 @@ These parts of the chapter will be added as the features arrive. None of them wo
 7. A shop sells three items at prices `p:10 20 30` in quantities `q:1 2 3`. Write the expression for the cost of each line (price times quantity), then the cost of each line with a flat fee of 5 added.
 8. Predict `10 20 30 - 1 2 3 * 2`, then `(10 20 30 - 1 2 3) * 2`. Which one subtracts first?
 9. Predict `5 3 8 > 4`, then store the answer in `big`. What does `3 > 2 + 5` print, and why is `3 + 2 > 5` not a boolean?
+10. Predict `til 3 + 2` and `(til 3) + 2`, then run both. Which one adds first?
+11. With `v:10 20 30 40 50`, write an expression for its last item without typing `4` (hint: `count`, and remember that `v count v - 1` does not do what it seems to).
+12. What is `v[1 7 -1]`? Why is none of the three an error?
+13. With `x:1 2 3`, predict `x -1`, `x - 1` and `x -1 + 1`, then run them.
+14. Predict `-3#1 2` and `4#`b`c`, then run them. What does `0#1 2.5` print, and why is that not an error?
+15. Predict `2,3#4 5` (which verb runs first?), then run it.
+16. Make the vector `7 7 7 7` without typing four sevens, and a six-item vector `1 2 1 2 1 2` from `1 2`.
+17. Predict `(0.2+0.1) = 0.3` and `(0.5+0.5) = 1.0`. Which one is true, and why?
+18. Is `(1,2) , 3.5` a float vector? Predict, then run it.
 
 ## Key Takeaways
 
@@ -517,10 +666,13 @@ These parts of the chapter will be added as the features arrive. None of them wo
 - `` `a `` is a symbol atom and `` `a`b `` a symbol vector
 - A string is a character vector; one character in quotes is an atom
 - `2 -1` is a two-item vector; write `2 - 1` for subtraction
-- Two values side by side that are not one literal are application, which is not built yet (`x -1` is the classic surprise)
+- Two values side by side that are not one literal are application: a vector applied to an index, a name applied to its argument (`x -1` with a vector `x` is the classic surprise: it indexes with -1 and gives a null)
 - Variables hold vectors, and reading one does not copy it
 - A null inside a float vector is `0n`
 - `= <> < <= > >=` compare item by item and give booleans (`1b`, or a boolean vector like `101b`); null equals null and sorts lowest; comparing across kinds is `'type`; `=` asks, `:` assigns
+- `til n` makes `0 .. n-1` and `count` counts items; a name is applied to everything on its right (`til 3+2` is `til 5`), or to its brackets (`til[5]`)
+- `v[i]` and `v i` index a vector: an atom for an atom index, a vector for a vector of indexes; out of range or negative gives the type's null, never an error; an atom cannot be indexed, and too many indexes are `'rank`
+- `neg` negates, as O's leading minus does
 - `+ - * %` work item by item on vectors: an atom is paired with every item, two vectors pair up if they have the same length (`'length` otherwise), `%` gives floats, and symbols and strings are `'type`
-- `n#v` takes the first `n` items (wrapping; negative from the end; an atom repeats); `x,y` joins and never converts types, so `1,2.5` is a general list; `!` and reshape are still to come
-- Indexing, `til`, `count` and the rest are still to come
+- `n#v` takes the first `n` items (wrapping; negative from the end; an atom repeats); `x,y` joins and never converts types, so `1,2.5` is a general list
+- General lists, item assignment, `;` statements, adverbs and functions are still to come
