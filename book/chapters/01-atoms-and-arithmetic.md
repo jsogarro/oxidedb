@@ -164,6 +164,14 @@ oxidedb> -5 + 3
 -2
 ```
 
+A minus applied to an expression (rather than glued to a number) negates everything to its right, so `-x+3` is `-(x+3)`:
+```
+oxidedb> x:2
+2
+oxidedb> -x+3
+-5
+```
+
 ## Exercises
 
 Try these expressions in the REPL and verify your understanding:

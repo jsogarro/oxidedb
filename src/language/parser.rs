@@ -8,11 +8,21 @@ use anyhow::{anyhow, Result};
 pub struct Parser {
     tokens: Vec<Token>,
     current: usize,
+    depth: usize,
 }
 
+const MAX_DEPTH: usize = 256;
+
 impl Parser {
-    pub fn new(tokens: Vec<Token>) -> Self {
-        Self { tokens, current: 0 }
+    pub fn new(mut tokens: Vec<Token>) -> Self {
+        if !matches!(tokens.last(), Some(Token::Eof)) {
+            tokens.push(Token::Eof);
+        }
+        Self {
+            tokens,
+            current: 0,
+            depth: 0,
+        }
     }
 
     pub fn parse(&mut self) -> Result<Expr> {
@@ -27,7 +37,13 @@ impl Parser {
     }
 
     fn expression(&mut self) -> Result<Expr> {
-        self.assignment()
+        if self.depth >= MAX_DEPTH {
+            return Err(anyhow!("expression nested too deeply"));
+        }
+        self.depth += 1;
+        let result = self.assignment();
+        self.depth -= 1;
+        result
     }
 
     fn assignment(&mut self) -> Result<Expr> {
@@ -72,7 +88,8 @@ impl Parser {
 
     fn unary(&mut self) -> Result<Expr> {
         if self.match_tokens(&[Token::Minus]) {
-            let expr = self.unary()?;
+            // Monadic minus takes its whole right side, as in q: -x+3 is -(x+3).
+            let expr = self.expression()?;
             return Ok(Expr::UnaryOp {
                 operator: UnaryOperator::Negate,
                 operand: Box::new(expr),
