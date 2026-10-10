@@ -319,9 +319,11 @@ fn iassign_cow_copies() {
 
 #[test]
 fn iassign_undefined_name() {
-    // q treats an undefined name as an empty list: every index is out of range
-    assert_eq!(err(&["u[0]:5"]), QError::Length);
-    assert_eq!(err(&["u[0 1]:5"]), QError::Length);
+    // Deliberately not q (which reads an undefined name as `()` and says 'length): the same
+    // error a read gives
+    for line in ["u[0]:5", "u[0 1]:5", "u[`a]:5", "u[0#0]:5", "u[]:5"] {
+        assert_eq!(err(&[line]), QError::Undefined("u".into()), "{line}");
+    }
     // the value is evaluated first, so its own error wins
     assert_eq!(err(&["u[0]:nosuch"]), QError::Undefined("nosuch".into()));
     assert_eq!(
@@ -340,15 +342,17 @@ fn iassign_target_must_be_a_list() {
     assert_eq!(err(&["x:5", "x[0]:1"]), QError::Type);
     assert_eq!(err(&["x:`a", "x[0]:`b"]), QError::Type);
     // a builtin name is not assignable, as for `count:1`
-    assert_eq!(
-        err(&["count[0]:1"]),
-        QError::parse("cannot assign to builtin count")
-    );
+    // a call is not a target; q says 'nyi for all of these
+    let call = QError::Nyi("assignment to a function call".into());
+    assert_eq!(err(&["count[0]:1"]), call);
+    assert_eq!(err(&["v:1 2 3", "(neg v[0]):5"]), call);
+    assert_eq!(err(&["v:1 2 3", "(count v):5"]), call);
+    // a variable applied by juxtaposition is a target, as in q
+    assert_eq!(show(&["v:1 2 3", "(v 0):5", "v"]), "5 2 3");
     // anything but a plain name is not built (depth assignment)
     let depth = QError::Nyi("depth assignment".into());
     assert_eq!(err(&["v:1 2 3", "v[0][0]:9"]), depth);
     assert_eq!(err(&["v:1 2 3", "v[0;1]:9"]), depth);
-    assert_eq!(err(&["v:1 2 3", "v[]:9"]), depth);
     assert_eq!(err(&["1 2 3[0]:9"]), depth);
     assert_eq!(err(&["5[0]:1"]), depth);
     assert_eq!(err(&["til[3][0]:1"]), depth);
@@ -361,7 +365,9 @@ fn iassign_target_must_be_a_list() {
     assert_eq!(err(&["v:1 2 3", "v[0]+:1"]), compound);
     assert_eq!(err(&["v:1 2 3", "v[0 1]-:1 1"]), compound);
     assert_eq!(err(&["x:1", "x+:1"]), compound);
-    // a variable of the same name as nothing built-in works with juxtaposition left alone
+    // only a name or an indexed name can be the left side of one
+    assert_eq!(err(&["1+:2"]), QError::parse("unexpected :"));
+    // juxtaposition with a literal is not a target
     assert_eq!(
         err(&["v:1 2 3", "v 0:5"]),
         QError::parse("unexpected : after expression")
@@ -510,4 +516,256 @@ fn iassign_library_values() {
     // a non-empty general list is not an index
     i.set("e", Value::List(Rc::new(vec![long(0), sym("a")])));
     assert_eq!(i.eval_line("v[e]:5"), Err(QError::Type));
+}
+
+#[test]
+fn iassign_assign_all_items() {
+    // `v[]:x` replaces every item (q: 9 9 9)
+    assert_eq!(session(&["v:1 2 3", "v[]:9"]), Ok(longs(&[9, 9, 9])));
+    assert_eq!(show(&["v:1 2 3", "v[]:7 8 9", "v"]), "7 8 9");
+    assert_eq!(err(&["v:1 2 3", "v[]:7 8"]), QError::Length);
+    assert_eq!(err(&["v:1 2 3", "v[]:1.5"]), QError::Type);
+    assert_eq!(show(&["v:0#0", "v[]:9", "v"]), "`long$()");
+    assert_eq!(show(&["v:1 2 3", "w:v", "v[]:0", "w"]), "1 2 3");
+    let mut i = Interpreter::new();
+    i.set(
+        "l",
+        Value::List(Rc::new(vec![long(1), sym("a"), longs(&[7])])),
+    );
+    i.eval_line("l[]:9").unwrap();
+    assert_eq!(i.get("l"), Some(&longs(&[9, 9, 9])));
+}
+
+#[test]
+fn iassign_list_target_counts() {
+    let mut i = Interpreter::new();
+    let mixed = Value::List(Rc::new(vec![long(1), sym("a"), longs(&[7, 8])]));
+    i.set("l", mixed.clone());
+    // too many or too few values for the positions is 'length, nothing is changed
+    for line in ["l[0 1]:7 8 9", "l[0 1 2]:7 8", "l[0 1]:1#7"] {
+        assert_eq!(i.eval_line(line), Err(QError::Length), "{line}");
+        assert_eq!(i.get("l"), Some(&mixed), "{line}");
+    }
+    i.set("w", Value::List(Rc::new(vec![long(2)])));
+    assert_eq!(i.eval_line("l[0 1]:w"), Err(QError::Length));
+    assert_eq!(i.get("l"), Some(&mixed));
+}
+
+#[test]
+fn iassign_atom_target_is_type() {
+    // the target's type is checked before the index, so an out-of-range index does not matter
+    assert_eq!(err(&["x:5", "x[5]:1"]), QError::Type);
+    assert_eq!(err(&["x:5", "x[0 1]:1 2"]), QError::Type);
+    assert_eq!(err(&["x:5", "x[-1]:1"]), QError::Type);
+    assert_eq!(err(&["x:5", "x[]:1"]), QError::Type);
+}
+
+#[test]
+fn iassign_general_list_index() {
+    // a general list of long/boolean atoms indexes like a vector (q: v[0,1b]:9)
+    let mut i = Interpreter::new();
+    i.set("v", longs(&[1, 2, 3]));
+    i.set(
+        "e",
+        Value::List(Rc::new(vec![long(0), Value::Atom(Atom::Boolean(true))])),
+    );
+    i.eval_line("v[e]:9").unwrap();
+    assert_eq!(i.get("v"), Some(&longs(&[9, 9, 3])));
+    i.eval_line("v[e]:7 8").unwrap();
+    assert_eq!(i.get("v"), Some(&longs(&[7, 8, 3])));
+    // other items are a type error, an out of range one is 'length
+    i.set("e", Value::List(Rc::new(vec![long(0), sym("a")])));
+    assert_eq!(i.eval_line("v[e]:5"), Err(QError::Type));
+    i.set("e", Value::List(Rc::new(vec![long(0), long(7)])));
+    assert_eq!(i.eval_line("v[e]:5"), Err(QError::Length));
+    i.set("e", Value::List(Rc::new(vec![long(0), longs(&[1])])));
+    assert_eq!(i.eval_line("v[e]:5"), Err(QError::Type));
+    assert_eq!(i.get("v"), Some(&longs(&[7, 8, 3])));
+}
+
+#[test]
+fn iassign_failure_does_not_copy_a_shared_vector() {
+    let mut i = Interpreter::new();
+    i.set("v", longs(&[1, 2, 3]));
+    i.eval_line("w:v").unwrap();
+    assert_eq!(i.eval_line("v[0]:1.5"), Err(QError::Type));
+    let (Some(Value::Vector(a)), Some(Value::Vector(b))) = (i.get("v"), i.get("w")) else {
+        panic!()
+    };
+    assert!(Rc::ptr_eq(a, b), "a failed assignment must not copy");
+}
+
+#[test]
+fn iassign_collapse_only_when_possible() {
+    // a mixed list stays a list; the last mismatch going away collapses it
+    let mut i = Interpreter::new();
+    i.set("l", Value::List(Rc::new(vec![long(1), long(2), sym("a")])));
+    i.eval_line("l[0]:5").unwrap();
+    assert_eq!(i.get("l").unwrap().type_code(), 0);
+    i.eval_line("l[2]:6").unwrap();
+    assert_eq!(i.get("l"), Some(&longs(&[5, 2, 6])));
+    // an early duplicate that is replaced by an atom still collapses
+    i.set("l", Value::List(Rc::new(vec![long(1), long(2)])));
+    i.set("n", Value::List(Rc::new(vec![longs(&[1, 2]), long(4)])));
+    i.eval_line("l[0 0]:n").unwrap();
+    assert_eq!(i.get("l"), Some(&longs(&[4, 2])));
+}
+
+// ---- value nesting cap ----
+
+use oxidedb::types::value::MAX_VALUE_DEPTH;
+
+/// A list `d` levels deep: `(( ... (1;2.5) ... );2.5)`. Depth 0 is an atom.
+fn nested(d: usize) -> Value {
+    let mut v = long(1);
+    for _ in 0..d {
+        v = Value::List(Rc::new(vec![v, Value::Atom(Atom::Float(2.5))]));
+    }
+    v
+}
+
+#[test]
+fn nesting_helper_counts_levels() {
+    assert!(!long(1).nests_deeper_than(0));
+    assert!(!longs(&[1, 2]).nests_deeper_than(0));
+    assert!(!nested(1).nests_deeper_than(1));
+    assert!(nested(1).nests_deeper_than(0));
+    assert!(!nested(5).nests_deeper_than(5));
+    assert!(nested(5).nests_deeper_than(4));
+    // the deepest branch counts, wherever it is
+    let wide = Value::List(Rc::new(vec![nested(1), nested(3), nested(2)]));
+    assert!(!wide.nests_deeper_than(4));
+    assert!(wide.nests_deeper_than(3));
+    // check_nesting reserves levels for the caller
+    assert!(nested(MAX_VALUE_DEPTH).check_nesting(0).is_ok());
+    assert!(matches!(
+        nested(MAX_VALUE_DEPTH + 1).check_nesting(0),
+        Err(QError::Limit(_))
+    ));
+    assert!(nested(MAX_VALUE_DEPTH - 1).check_nesting(1).is_ok());
+    assert!(nested(MAX_VALUE_DEPTH).check_nesting(1).is_err());
+    assert_eq!(
+        nested(MAX_VALUE_DEPTH + 1)
+            .check_nesting(0)
+            .unwrap_err()
+            .to_string(),
+        format!("'limit: nesting deeper than {MAX_VALUE_DEPTH}")
+    );
+}
+
+#[test]
+fn nesting_helper_is_bounded_on_deep_and_shared_values() {
+    // far deeper than any thread could recurse: the check stops at the limit
+    let deep = nested(100_000);
+    assert!(deep.nests_deeper_than(MAX_VALUE_DEPTH));
+    std::mem::forget(deep); // dropping 100,000 levels would itself overflow
+                            // a shared value (2^60 paths, 60 distinct nodes) is checked in time proportional to nodes
+    let mut v = nested(1);
+    for _ in 0..60 {
+        v = Value::List(Rc::new(vec![v.clone(), v]));
+    }
+    assert!(!v.nests_deeper_than(MAX_VALUE_DEPTH));
+    assert!(v.nests_deeper_than(10));
+}
+
+#[test]
+fn iassign_nesting_boundary() {
+    let mut i = Interpreter::new();
+    // depth N-1 held, assigned into itself: depth N is the cap and is fine
+    i.set("l", nested(MAX_VALUE_DEPTH - 1));
+    i.eval_line("l[0]:l").unwrap();
+    assert!(!i.get("l").unwrap().nests_deeper_than(MAX_VALUE_DEPTH));
+    assert!(i.get("l").unwrap().nests_deeper_than(MAX_VALUE_DEPTH - 1));
+    // one more level is 'limit and nothing changes
+    let before = i.get("l").cloned().unwrap();
+    let e = i.eval_line("l[0]:l").unwrap_err();
+    assert_eq!(
+        e.to_string(),
+        format!("'limit: nesting deeper than {MAX_VALUE_DEPTH}")
+    );
+    assert_eq!(i.get("l"), Some(&before));
+    // every way in: either slot, pairwise from a list value (its items are what go in)
+    for line in ["l[0]:l", "l[1]:l"] {
+        assert!(matches!(i.eval_line(line), Err(QError::Limit(_))), "{line}");
+    }
+    i.set("pair", Value::List(Rc::new(vec![before.clone(), long(1)])));
+    assert!(matches!(i.eval_line("l[0 1]:pair"), Err(QError::Limit(_))));
+    assert_eq!(i.get("l"), Some(&before));
+    // a shallower value still goes in, and a limit error is not a state change
+    i.eval_line("l[0]:5").unwrap();
+}
+
+/// eq, arithmetic, negation, display and drop of values at the cap, on a 2 MB stack.
+#[test]
+fn nesting_at_the_cap_is_safe_on_a_small_stack() {
+    std::thread::Builder::new()
+        .stack_size(2 * 1024 * 1024)
+        .spawn(|| {
+            let v = nested(MAX_VALUE_DEPTH);
+            let w = nested(MAX_VALUE_DEPTH);
+            assert_eq!(v, w);
+            assert_ne!(v, nested(MAX_VALUE_DEPTH - 1));
+            let mut i = Interpreter::new();
+            i.set("l", v.clone());
+            for line in [
+                "l+1", "1+l", "l=l", "l<>l", "l,l", "neg l", "l+l", "count l",
+            ] {
+                let _ = i.eval_line(line);
+            }
+            assert!(!v.to_string().is_empty());
+            drop(i);
+            drop(v);
+            drop(w);
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
+#[test]
+fn shared_nesting_does_not_blow_up_equality() {
+    // equal by identity at every level: must not walk 2^60 paths
+    let mut v = nested(1);
+    for _ in 0..60 {
+        v = Value::List(Rc::new(vec![v.clone(), v]));
+    }
+    assert_eq!(v, v.clone());
+}
+
+#[test]
+fn iassign_every_pairwise_item_is_checked_for_nesting() {
+    let mut i = Interpreter::new();
+    i.set("l", Value::List(Rc::new(vec![long(1), long(2), long(3)])));
+    // only the LAST of the new items is too deep
+    let deep = nested(MAX_VALUE_DEPTH);
+    i.set("pair", Value::List(Rc::new(vec![long(1), long(2), deep])));
+    assert!(matches!(
+        i.eval_line("l[0 1 2]:pair"),
+        Err(QError::Limit(_))
+    ));
+    assert_eq!(
+        i.get("l"),
+        Some(&Value::List(Rc::new(vec![long(1), long(2), long(3)])))
+    );
+}
+
+#[test]
+fn nesting_helper_rechecks_a_shared_list_at_each_depth() {
+    // `a` (3 levels) is reached shallowly first and again under two more lists: 6 levels in all
+    let a = nested(3);
+    let two_down = Value::List(Rc::new(vec![Value::List(Rc::new(vec![a.clone()]))]));
+    let v = Value::List(Rc::new(vec![a, two_down]));
+    assert!(v.nests_deeper_than(5));
+    assert!(!v.nests_deeper_than(6));
+}
+
+#[test]
+fn amend_rejects_an_atom_target_itself() {
+    // not only through the interpreter, which would fail later when reading the atom back
+    let mut x = long(5);
+    for idx in [long(0), long(5), longs(&[0, 1])] {
+        let r = oxidedb::language::apply::amend(&mut x, &idx, &long(1));
+        assert_eq!(r, Err(QError::Type));
+    }
+    assert_eq!(x, long(5));
 }

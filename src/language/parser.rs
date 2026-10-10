@@ -209,7 +209,13 @@ impl Parser {
                 self.advance();
                 // `v[0]+:1`, `x+:1`
                 if self.check(&Token::Colon) {
-                    return Err(QError::Nyi("compound assignment".into()));
+                    // only a name or an indexed name can be assigned to
+                    return Err(match operands.last() {
+                        Some(Expr::Symbol(_) | Expr::Apply { .. }) => {
+                            QError::Nyi("compound assignment".into())
+                        }
+                        _ => QError::parse("unexpected :"),
+                    });
                 }
                 Join::Verb(verb)
             } else if starts_noun(self.peek()) {
@@ -239,21 +245,24 @@ impl Parser {
         Ok(right)
     }
 
-    /// The `v[i]` already parsed, its `:` read; only a plain name with one index is built.
+    /// The `v[i]` already parsed, its `:` read; only a plain name with at most one index is
+    /// built (`v[]` is every item). A builtin is a call, not a target (q: `'nyi`).
     fn index_assignment(&mut self, target: Expr) -> QResult<Expr> {
-        match target {
-            Expr::Apply { func, mut args } if args.len() == 1 => match *func {
-                Expr::Symbol(name) => {
-                    assignable(&name)?;
-                    let value = self.expression()?;
-                    Ok(Expr::IndexAssignment {
-                        name,
-                        index: Box::new(args.remove(0)),
-                        value: Box::new(value),
-                    })
-                }
-                _ => Err(QError::Nyi("depth assignment".into())),
-            },
+        let Expr::Apply { func, mut args } = target else {
+            unreachable!("only applications reach here")
+        };
+        match (*func, args.len()) {
+            (Expr::Symbol(name), 0 | 1) if builtins::lookup(&name).is_some() => {
+                Err(QError::Nyi("assignment to a function call".into()))
+            }
+            (Expr::Symbol(name), 0 | 1) => {
+                let value = self.expression()?;
+                Ok(Expr::IndexAssignment {
+                    name,
+                    index: args.pop().map(Box::new),
+                    value: Box::new(value),
+                })
+            }
             _ => Err(QError::Nyi("depth assignment".into())),
         }
     }

@@ -611,18 +611,20 @@ So a read is forgiving and a write is strict. To make a vector longer, join to i
 
 ### What can be assigned to
 
-Only a name can have its items changed. The name must hold a vector or a list: an atom is a `'type` error, and a name with no value is a `'length` error (q treats a name it does not know as an empty list, so every index is out of range). Changing an item of an item (`d[0][1]:5`), several indexes in one bracket and the combined forms such as `d[0]+:1` are not supported yet:
+Only a name can have its items changed. The name must hold a vector or a list: an atom is a `'type` error, and a name with no value is the same error a read gives (q instead treats a name it does not know as an empty list and says `'length`; O reports the name, which is almost always a typo). Empty brackets, `d[]:9`, change every item. Changing an item of an item (`d[0][1]:5`), several indexes in one bracket and the combined forms such as `d[0]+:1` are not supported yet:
 ```
 oxidedb> y:5
 5
 oxidedb> y[0]:1
 'type
 oxidedb> nothing[0]:1
-'length
+'nothing (Undefined variable)
 oxidedb> d[0][1]:2
 'nyi: depth assignment
 oxidedb> d[0]+:1
 'nyi: compound assignment
+oxidedb> d[]:9
+9 9 9
 ```
 
 ## Take (`#`)

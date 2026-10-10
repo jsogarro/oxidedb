@@ -23,10 +23,11 @@ pub enum Expr {
         name: String,
         value: Box<Expr>,
     },
-    /// `name[index]:value`: the target is always a plain name.
+    /// `name[index]:value`: the target is always a plain name. No index (`name[]:value`)
+    /// means every item.
     IndexAssignment {
         name: String,
-        index: Box<Expr>,
+        index: Option<Box<Expr>>,
         value: Box<Expr>,
     },
 }

@@ -193,10 +193,15 @@ fn application_and_bracket_links_spend_from_the_budget() {
 }
 
 /// `v[0]:` + a `k`-operator chain, and the chain inside the index instead. `v` is unbound, so a
-/// line that parses ends in the evaluation error `'length`.
+/// line that parses ends in the evaluation error `'v (Undefined variable)`.
 #[test]
 fn index_assignment_spends_from_the_budget() {
-    let parses = |src: String| assert_eq!(run_child(&src, 8192), Err("'length".to_string()));
+    let parses = |src: String| {
+        assert_eq!(
+            run_child(&src, 8192),
+            Err("'v (Undefined variable)".to_string())
+        )
+    };
     // the line spends 1, the bracket link 1, the index 1, the value 1, each operator 1
     let value = |k: usize| format!("v[0]:{}1", "1+".repeat(k));
     parses(value(1996));
@@ -405,4 +410,38 @@ fn binary_propagates_a_panic_from_the_interpreter_thread() {
     drop(stdin);
     let out = wait_timeout(child, "binary");
     assert_eq!(out.status.code(), Some(101), "{:?}", out.status);
+}
+
+/// Nesting built up one level per line is invisible to the per-line budget: it is capped by
+/// `MAX_VALUE_DEPTH` instead. Before the cap, `l=l`, `l+1` and `neg l` aborted the process with
+/// a stack overflow after tens of thousands of such lines.
+#[test]
+fn value_nesting_is_capped_across_lines() {
+    use oxidedb::types::value::MAX_VALUE_DEPTH;
+    let lines = MAX_VALUE_DEPTH + 50;
+    let mut script = String::from("l:1,2.5\n");
+    script.push_str(&"count l[0]:l\n".repeat(lines));
+    script.push_str("l=l\nl+1\nneg l\n1+99\nexit\n");
+    let mut child = Command::new(BIN)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut stdin = child.stdin.take().unwrap();
+    let feeder = std::thread::spawn(move || {
+        let _ = stdin.write_all(script.as_bytes());
+    });
+    let out = wait_timeout(child, "binary");
+    feeder.join().unwrap();
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(out.status.code(), Some(0), "{:?}: {stderr}", out.status);
+    // `l:1,2.5` is one level deep, so MAX_VALUE_DEPTH - 1 assignments fit and every later one
+    // is a `'limit`: the boundary is exact.
+    let limits = stderr.matches("'limit: nesting deeper than 64").count();
+    assert_eq!(limits, lines - (MAX_VALUE_DEPTH - 1), "{stderr}");
+    assert_eq!(stderr.matches("'limit").count(), limits);
+    // l=l, l+1 and neg l at the cap did not end the session: the last line still ran
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.lines().any(|l| l.trim() == "100"), "{stdout}");
 }

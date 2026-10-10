@@ -10,8 +10,10 @@ pub enum QError {
     Length,
     #[error("'rank")]
     Rank,
-    #[error("'index")]
-    Index,
+    /// An implementation limit (q's `'limit`), e.g. value nesting deeper than
+    /// `MAX_VALUE_DEPTH`.
+    #[error("'limit: {0}")]
+    Limit(String),
     #[error("'domain")]
     Domain,
     #[error("'nyi: {0}")]

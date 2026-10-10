@@ -67,11 +67,12 @@ fn index(f: &Value, i: &Value) -> QResult<Value> {
 }
 
 /// `target[idx]:val`, in place (copy-on-write when the vector is shared). Checked in q's order,
-/// and nothing changes on an error: the index must be long or boolean (`'type`), every position
-/// in range (`'length`, where a read gives a null), the value's count must fit (`'length`),
-/// and for a vector its type must match exactly (`'type`: no promotion). An atom cannot be
-/// amended. A general list takes any value; one that ends up with all items of one atom type
-/// collapses to a vector, as in q.
+/// and nothing changes on an error: the index must be long or boolean atoms (`'type`), every
+/// position in range (`'length`, where a read gives a null), the value's count must fit
+/// (`'length`), and for a vector its type must match exactly (`'type`: no promotion); for a
+/// general list the new items must not nest past `MAX_VALUE_DEPTH` (`'limit`). An atom cannot
+/// be amended. A general list takes any value; one that ends up with all items of one atom
+/// type collapses to a vector, as in q.
 pub fn amend(target: &mut Value, idx: &Value, val: &Value) -> QResult<()> {
     let len = match target {
         Value::Atom(_) => return Err(QError::Type),
@@ -85,9 +86,16 @@ pub fn amend(target: &mut Value, idx: &Value, val: &Value) -> QResult<()> {
             Column::Bool(v) => (v.iter().map(|&b| i64::from(b)).collect(), false),
             _ => return Err(QError::Type),
         },
-        // the empty general list is an empty index
+        // an empty general list is an empty index: nothing changes, whatever the value
         Value::List(items) if items.is_empty() => return Ok(()),
-        Value::List(_) => return Err(QError::Type),
+        // a general list of long and boolean atoms indexes like a vector of them
+        Value::List(items) => {
+            let each = items.iter().map(|x| match x {
+                Value::Atom(a) => position(a),
+                _ => Err(QError::Type),
+            });
+            (each.collect::<QResult<Vec<i64>>>()?, false)
+        }
     };
     let pos = positions
         .iter()
@@ -95,7 +103,7 @@ pub fn amend(target: &mut Value, idx: &Value, val: &Value) -> QResult<()> {
         .collect::<Option<Vec<usize>>>()
         .ok_or(QError::Length)?;
     // One item per position, or a single item broadcast.
-    let count_fits = |n: usize| scalar || n == pos.len();
+    let count_fits = |n: usize| n == pos.len();
     match target {
         Value::Vector(col) => {
             let src = match val {
@@ -119,6 +127,10 @@ pub fn amend(target: &mut Value, idx: &Value, val: &Value) -> QResult<()> {
                 }
                 _ => return Err(QError::Length),
             };
+            // before make_mut, so a failing assignment does not copy a shared vector
+            if src.type_code() != col.type_code() {
+                return Err(QError::Type);
+            }
             Rc::make_mut(col).assign(&pos, &src)
         }
         Value::List(items) => {
@@ -131,6 +143,8 @@ pub fn amend(target: &mut Value, idx: &Value, val: &Value) -> QResult<()> {
                 Value::List(l) if count_fits(l.len()) => l.to_vec(),
                 _ => return Err(QError::Length),
             };
+            // O(size of what goes in): shared lists are visited once
+            new.iter().try_for_each(|x| x.check_nesting(1))?;
             let list = Rc::make_mut(items);
             for (k, &p) in pos.iter().enumerate() {
                 list[p] = if new.len() == 1 {
@@ -139,8 +153,19 @@ pub fn amend(target: &mut Value, idx: &Value, val: &Value) -> QResult<()> {
                     new[k].clone()
                 };
             }
-            let all = std::mem::take(list);
-            *target = Value::from_items(all);
+            // Collapse only when every item is an atom of one type; stop at the first that is not.
+            let first = list.first().map(|x| match x {
+                Value::Atom(a) => Some(std::mem::discriminant(a)),
+                _ => None,
+            });
+            if let Some(Some(kind)) = first {
+                let uniform = list
+                    .iter()
+                    .all(|x| matches!(x, Value::Atom(a) if std::mem::discriminant(a) == kind));
+                if uniform {
+                    *target = Value::from_items(std::mem::take(list));
+                }
+            }
             Ok(())
         }
         Value::Atom(_) => unreachable!("atoms are rejected above"),

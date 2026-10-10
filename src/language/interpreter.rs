@@ -5,6 +5,7 @@ use crate::language::{
     lexer::{Lexer, Token},
     parser::Parser,
 };
+use crate::types::column::Column;
 use crate::types::value::Value;
 use std::collections::HashMap;
 
@@ -79,7 +80,7 @@ impl Interpreter {
                 Ok(val)
             }
             Expr::IndexAssignment { name, index, value } => {
-                self.evaluate_index_assignment(&name, *index, *value)
+                self.evaluate_index_assignment(&name, index.map(|i| *i), *value)
             }
         }
     }
@@ -90,13 +91,25 @@ impl Interpreter {
     fn evaluate_index_assignment(
         &mut self,
         name: &str,
-        index: Expr,
+        index: Option<Expr>,
         value: Expr,
     ) -> QResult<Value> {
         let value = self.evaluate(value)?;
-        let index = self.evaluate(index)?;
-        // q reads an undefined name as an empty list, so every index is out of range.
-        let target = self.variables.get_mut(name).ok_or(QError::Length)?;
+        let index = index.map(|i| self.evaluate(i)).transpose()?;
+        // Deliberately not q, which reads an undefined name as `()` ('length): the error a read gives.
+        let target = self
+            .variables
+            .get_mut(name)
+            .ok_or_else(|| QError::Undefined(name.to_string()))?;
+        // `v[]:x` assigns every item
+        let index = match index {
+            Some(index) => index,
+            None => match target {
+                Value::Atom(_) => return Err(QError::Type),
+                Value::Vector(c) => til(c.len()),
+                Value::List(l) => til(l.len()),
+            },
+        };
         apply::amend(target, &index, &value)?;
         // The statement's value is what the index now reads (duplicates: the last one won).
         apply::apply(target, &[index])
@@ -122,4 +135,9 @@ impl Interpreter {
         let f = self.evaluate(func)?;
         apply::apply(&f, &vals)
     }
+}
+
+/// `0 1 .. n-1` as a long vector.
+fn til(n: usize) -> Value {
+    Value::Vector(std::rc::Rc::new(Column::Long((0..n as i64).collect())))
 }
