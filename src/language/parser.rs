@@ -62,12 +62,17 @@ pub struct Parser {
     tokens: Vec<Token>,
     current: usize,
     depth: usize,
+    /// Expressions and operator joins parsed so far on this line (see `MAX_BUDGET`).
+    spent: usize,
 }
 
 /// Maximum nesting of parentheses / monadic minus.
 const MAX_DEPTH: usize = 128;
-/// Maximum operators in one flat chain (`1+1+...`); evaluate and drop recurse over it.
-const MAX_CHAIN: usize = 2_000;
+/// One budget per line, shared by every nesting level: each (sub)expression and each operator
+/// join spends one. The right-nested AST that evaluate and drop recurse over is at most this
+/// deep plus `MAX_DEPTH`, however the line mixes chains and nesting. A flat chain may hold 1,999
+/// operators (the line itself spends one).
+const MAX_BUDGET: usize = 2_000;
 
 impl Parser {
     pub fn new(mut tokens: Vec<Token>) -> Self {
@@ -78,6 +83,7 @@ impl Parser {
             tokens,
             current: 0,
             depth: 0,
+            spent: 0,
         }
     }
 
@@ -95,7 +101,16 @@ impl Parser {
         Ok(expr)
     }
 
+    fn spend(&mut self) -> QResult<()> {
+        self.spent += 1;
+        if self.spent > MAX_BUDGET {
+            return Err(QError::parse("expression too long"));
+        }
+        Ok(())
+    }
+
     fn expression(&mut self) -> QResult<Expr> {
+        self.spend()?;
         if self.depth >= MAX_DEPTH {
             return Err(QError::parse("expression nested too deeply"));
         }
@@ -156,9 +171,7 @@ impl Parser {
                 _ => unreachable!(),
             });
             // The AST is still a right-nested tree, which evaluate and drop recurse over.
-            if operators.len() >= MAX_CHAIN {
-                return Err(QError::parse("expression too long"));
-            }
+            self.spend()?;
         }
         let mut right = operands.pop().expect("at least one operand");
         while let Some(operator) = operators.pop() {
