@@ -76,8 +76,8 @@ fn display_col_float() {
     assert_eq!(col(Column::Float(vec![1.0, 2.0, 3.0])), "1 2 3f");
     assert_eq!(col(Column::Float(vec![20.0])), ",20f");
     assert_eq!(col(Column::Float(vec![2.5])), ",2.5");
-    assert_eq!(col(Column::Float(vec![1.0, f64::NAN, 3.0])), "1 0n 3f");
-    assert_eq!(col(Column::Float(vec![1.0, f64::INFINITY])), "1 0wf");
+    assert_eq!(col(Column::Float(vec![1.0, f64::NAN, 3.0])), "1 0n 3");
+    assert_eq!(col(Column::Float(vec![1.0, f64::INFINITY])), "1 0w");
 }
 
 #[test]
@@ -85,6 +85,15 @@ fn display_col_float_specials() {
     assert_eq!(col(Column::Float(vec![f64::NAN, 1.5])), "0n 1.5");
     assert_eq!(col(Column::Float(vec![f64::NEG_INFINITY, 1.5])), "-0w 1.5");
     assert_eq!(col(Column::Float(vec![f64::NAN, f64::NAN])), "0n 0n");
+    assert_eq!(
+        col(Column::Float(vec![f64::INFINITY, f64::INFINITY])),
+        "0w 0w"
+    );
+    assert_eq!(col(Column::Float(vec![f64::NAN])), ",0n");
+    assert_eq!(
+        col(Column::Float(vec![1.0, 2.0, 3.0, 4.0, 5.0])),
+        "1 2 3 4 5f"
+    );
     assert_eq!(col(Column::Float(vec![1e20, 1.0])), "1e+20 1");
     assert_eq!(col(Column::Float(vec![0.1 + 0.2, 1.0])), "0.3 1");
 }
@@ -123,4 +132,18 @@ fn display_col_empty() {
     assert_eq!(col(Column::Float(vec![])), "`float$()");
     assert_eq!(col(Column::Bool(vec![])), "`boolean$()");
     assert_eq!(col(Column::Sym(vec![])), "`symbol$()");
+}
+
+#[test]
+fn display_col_float_nan_equality_is_derived() {
+    // Documents the derived PartialEq: a float column holding 0n is not equal to itself.
+    // To be decided with the Value type.
+    let c = Column::Float(vec![1.0, f64::NAN]);
+    assert_ne!(c, c.clone());
+}
+
+#[test]
+fn display_atom_char_escapes_quote() {
+    assert_eq!(format!("{}", Atom::Character('"')), "\"\\\"\"");
+    assert_eq!(format!("{}", Atom::Character('a')), "\"a\"");
 }

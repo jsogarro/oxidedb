@@ -1,4 +1,4 @@
 pub mod atom;
 pub mod column;
-pub mod display;
+mod display;
 pub mod sym;

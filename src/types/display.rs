@@ -39,42 +39,41 @@ impl fmt::Display for Column {
             }
             Column::Long(v) => join(f, v, |f, &x| write!(f, "{}", Atom::Integer(x))),
             Column::Float(v) => {
-                // Some(integral) for finite elements; None for 0n / 0w, which are neutral.
-                let parts: Vec<(String, Option<bool>)> = v
+                // q adds one trailing `f` only when every element prints as a bare integer.
+                let parts: Vec<(String, bool)> = v
                     .iter()
                     .map(|&x| match x {
-                        x if x.is_nan() => ("0n".into(), None),
-                        x if x.is_infinite() => ((if x < 0.0 { "-0w" } else { "0w" }).into(), None),
-                        x => {
-                            let (d, integral) = float_digits(x);
-                            (d, Some(integral))
+                        x if x.is_nan() => ("0n".into(), false),
+                        x if x.is_infinite() => {
+                            ((if x < 0.0 { "-0w" } else { "0w" }).into(), false)
                         }
+                        x => float_digits(x),
                     })
                     .collect();
-                // One trailing `f` when no element needs a decimal point or exponent.
-                let suffix = parts.iter().any(|p| p.1 == Some(true))
-                    && parts.iter().all(|p| p.1 != Some(false));
                 join(f, &parts, |f, p| f.write_str(&p.0))?;
-                if suffix {
+                if parts.iter().all(|p| p.1) {
                     f.write_char('f')?;
                 }
                 Ok(())
             }
             Column::Char(v) => {
                 f.write_char('"')?;
-                for &c in v {
-                    match c {
-                        '"' => f.write_str("\\\"")?,
-                        '\\' => f.write_str("\\\\")?,
-                        '\n' => f.write_str("\\n")?,
-                        '\t' => f.write_str("\\t")?,
-                        '\r' => f.write_str("\\r")?,
-                        c => f.write_char(c)?,
-                    }
-                }
+                v.iter().try_for_each(|&c| write_escaped(f, c))?;
                 f.write_char('"')
             }
             Column::Sym(v) => v.iter().try_for_each(|s| write!(f, "{}", s)),
         }
+    }
+}
+
+/// A char as it appears inside a q string: `"`, `\` and control chars escaped.
+pub(crate) fn write_escaped(f: &mut fmt::Formatter, c: char) -> fmt::Result {
+    match c {
+        '"' => f.write_str("\\\""),
+        '\\' => f.write_str("\\\\"),
+        '\n' => f.write_str("\\n"),
+        '\t' => f.write_str("\\t"),
+        '\r' => f.write_str("\\r"),
+        c => f.write_char(c),
     }
 }

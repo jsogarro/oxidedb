@@ -1,3 +1,4 @@
+use super::display::write_escaped;
 use super::sym::Sym;
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use std::fmt;
@@ -120,7 +121,11 @@ impl fmt::Display for Atom {
                 write!(f, "{}0w", if *fl < 0.0 { "-" } else { "" })
             }
             Atom::Float(fl) => write_float(f, *fl),
-            Atom::Character(c) => write!(f, "\"{}\"", c),
+            Atom::Character(c) => {
+                f.write_str("\"")?;
+                write_escaped(f, *c)?;
+                f.write_str("\"")
+            }
             Atom::Date(d) => write!(f, "{}", d.format("%Y.%m.%d")),
             Atom::Time(t) => write!(f, "{}", t.format("%H:%M:%S.%3f")),
             Atom::Timestamp(ts) => write!(f, "{}", ts.format("%Y.%m.%dD%H:%M:%S.%9f")),
