@@ -1,81 +1,55 @@
 # OxideDB Architecture
 
-## Overview
+OxideDB is currently a small q-inspired expression interpreter (the **O** language) with a REPL and file runner. Everything described outside the "Planned" section exists on `main`.
 
-OxideDB is designed as a modular system with clear separation of concerns between language processing, data storage, and query execution.
+## Modules
 
-## Module Structure
+### `src/language/`
 
-### Language Module (`src/language/`)
+- `lexer.rs`: turns a line of text into a `Vec<Token>` ending in `Token::Eof`. Handles integer and float literals, `1b`/`0b` booleans, `"c"` characters, identifiers (variable names), the `0N`/`0n`/`0w` null and infinity literals, and `/` comments (a `/` at line start or after whitespace comments out the rest of the line).
+- `parser.rs`: builds an `Expr` from the tokens.
+- `ast.rs`: `Expr` (atom, symbol, binary op, unary op, assignment) and the `+ - * %` / negate operators.
+- `interpreter.rs`: evaluates an `Expr` against a `HashMap<String, Atom>` of variables. `Interpreter::eval_line` runs the whole pipeline for one line.
 
-- **Lexer** (`lexer.rs`): Tokenizes Q-like syntax into a stream of tokens
-- **Parser** (`parser.rs`): Builds an Abstract Syntax Tree (AST) from tokens
-- **AST** (`ast.rs`): Defines the structure of parsed expressions
-- **Interpreter** (`interpreter.rs`): Evaluates AST nodes and executes operations
+### `src/types/`
 
-### Types Module (`src/types/`)
+- `atom.rs`: the scalar `Atom` enum (boolean, long, float, character, symbol, date, time, timestamp, and typed temporal nulls) with q type codes and q-style display.
+- `sym.rs`: interned symbols, a 4-byte handle into a process-global string table. Interned names are never freed.
+- `column.rs`: `Column`, a typed vector (bool, long, float, char, symbol). It exists as a type with its own tests but the language cannot create one yet.
+- `display.rs`: q-style `Display` for `Column` (`1 2 3`, `1 2 3f`, `101b`, `` `a`b ``, `"abc"`) and the character escaping shared with `Atom`'s `Display`.
 
-- **Atom** (`atom.rs`): Scalar values with Q's type system
-- **Sym** (`sym.rs`): Interned symbols
-- **Column** (`column.rs`): Typed vectors (bool, long, float, char, symbol); not yet reachable from the language
+### `src/repl/` and `src/main.rs`
 
-Dictionaries and tables are planned (see below).
+`Repl` wraps a `rustyline` editor and one `Interpreter`. `main` starts the interactive loop, or runs a file when given a path argument.
 
-### Planned
+## Evaluation pipeline
 
-Persistent storage, a query planner, and memory management are not implemented yet.
+1. **Tokenize**: `Lexer::tokenize`. A line with no tokens other than `Eof` (blank or comment-only) evaluates to nothing.
+2. **Parse**: `Parser::parse`. A flat operator chain is parsed iteratively into a right-nested tree, so there is no precedence: `1+2*3` is `1+(2*3)`. Limits keep recursion bounded: nesting of parentheses and monadic minus is capped at 128, and a flat chain at 2,000 operators. Exceeding either is an error, not a crash.
+3. **Evaluate**: `Interpreter::evaluate`. The right operand is evaluated before the left, as in q, including side effects such as assignment. Mixed long/float arithmetic promotes to float; `%` is always float division.
 
-### REPL Module (`src/repl/`)
+## Values
 
-- Interactive Read-Eval-Print Loop implementation
-- Command history and line editing
-- Error handling and display
+Every result is an `Atom`. Symbol, date, time and timestamp atoms exist as types, but the language has no literal for them yet. Long, float, character and symbol nulls are sentinels, not separate variants: `Integer(i64::MIN)`, `Float(NaN)`, `Character(' ')`, `Symbol(Sym::NULL)`. Producing `i64::MIN` by arithmetic is reported as overflow. Only the temporal nulls have their own variants. Variables live in the interpreter's map for the length of the session and are not saved.
 
-## Design Principles
+## Error handling
 
-### Type System
+Lexing, parsing and evaluation return `anyhow::Result`. The REPL prints `Error: <message>` and keeps the session; `run_file` stops at the first failing line and reports its line number. Arithmetic overflow, undefined variables, unsupported operand types and the parser limits above are ordinary errors.
 
-OxideDB implements Q's type system with the following type codes:
+## Testing
 
-- `-1`: Boolean
-- `-7`: Long (64-bit integer)
-- `-9`: Float (64-bit float)
-- `-10`: Character
-- `-11`: Symbol
-- `-12`: Timestamp
-- `-14`: Date
-- `-19`: Time
+- `tests/*.rs`: one integration test file per area (arithmetic, atoms, comments, display, literals, nesting limits, parsing, types, file running). They drive the public API (`Interpreter`, `Lexer`, `Parser`).
+- `tests/robustness.rs`: property tests (`proptest`) asserting that arbitrary input never panics.
+- `tests/book_examples.rs`: runs every expected output in `book/` and `book/examples/` through the real interpreter.
+- `benches/performance.rs`: Criterion benchmarks for the lexer, parser, evaluator and the full line pipeline.
 
-Each type has corresponding null values and promotion rules.
+There are no `#[cfg(test)]` modules in `src/`.
 
-### Memory Model
+## Planned
 
-- **Reference Counting**: Shared data structures use Arc<RwLock<T>>
-- **Copy-on-Write**: Immutable operations avoid unnecessary copying
-- **Columnar Storage**: Tables store data by column for cache efficiency
+Not implemented; nothing here is partially present.
 
-### Error Handling
-
-- Uses `anyhow::Result<T>` for comprehensive error propagation
-- Graceful error recovery in the REPL
-- Detailed error messages with context
-
-## Future Considerations
-
-### Performance Optimizations
-
-- SIMD operations for vector arithmetic
-- Just-in-time compilation for hot code paths
-- Memory-mapped file I/O for large datasets
-
-### Concurrency
-
-- Lock-free data structures where possible
-- Work-stealing thread pool for parallel operations
-- Async I/O for network operations
-
-### Compatibility
-
-- Q language compatibility where feasible
-- Import/export compatibility with KDB+ formats
-- SQL interface for broader accessibility
+- Vectors and lists in the language (indexing, vector arithmetic).
+- Dictionaries and tables, and queries over them.
+- Functions, conditionals and adverbs.
+- Persistence of variables and tables.

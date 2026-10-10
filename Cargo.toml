@@ -17,6 +17,10 @@ colored = "2.0"
 criterion = "0.5"
 proptest = "1.0"
 
+[profile.release]
+lto = "thin"
+codegen-units = 1
+
 [[bench]]
 name = "performance"
 harness = false
