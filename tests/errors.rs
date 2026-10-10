@@ -58,7 +58,13 @@ fn errors_parse_kind() {
         QError::Parse("expression nested too deeply".into())
     );
     let long = format!("{}1", "1+".repeat(2000));
-    assert_eq!(err(&long), QError::Parse("expression too long".into()));
+    assert_eq!(
+        err(&long),
+        QError::Parse(
+            "expression too long (a line may hold at most 2000 operators and sub-expressions)"
+                .into()
+        )
+    );
 }
 
 #[test]
