@@ -10,7 +10,7 @@ use crate::types::value::Value;
 use std::rc::Rc;
 
 /// The not-yet-implemented error for a token the parser cannot handle yet
-/// (list literals, adverbs, verbs, punctuation); `None` for any other token.
+/// (adverbs, punctuation, a verb used monadically); `None` for any other token.
 fn nyi_token(token: &Token) -> Option<QError> {
     let detail = match token {
         Token::Over | Token::Scan => format!("adverb '{token}'"),
@@ -35,6 +35,26 @@ fn nyi_token(token: &Token) -> Option<QError> {
         _ => return None,
     };
     Some(QError::Nyi(detail))
+}
+
+/// The binary verb a token spells, if any.
+fn verb_of(token: &Token) -> Option<Verb> {
+    Some(match token {
+        Token::Plus => Verb::Add,
+        Token::Minus => Verb::Subtract,
+        Token::Multiply => Verb::Multiply,
+        Token::Divide => Verb::Divide,
+        Token::Equal => Verb::Equal,
+        Token::Less => Verb::Less,
+        Token::Greater => Verb::Greater,
+        Token::NotEqual => Verb::NotEqual,
+        Token::LessEqual => Verb::LessEqual,
+        Token::GreaterEqual => Verb::GreaterEqual,
+        Token::Hash => Verb::Take,
+        Token::Comma => Verb::Join,
+        Token::Bang => Verb::Key,
+        _ => return None,
+    })
 }
 
 fn vector(column: Column) -> Expr {
@@ -145,16 +165,11 @@ impl Parser {
                 return Err(QError::Nyi("application".into()));
             }
             operands.push(operand);
-            if !self.match_tokens(&[Token::Plus, Token::Minus, Token::Multiply, Token::Divide]) {
+            let Some(verb) = verb_of(self.peek()) else {
                 break;
-            }
-            operators.push(match self.previous() {
-                Token::Plus => Verb::Add,
-                Token::Minus => Verb::Subtract,
-                Token::Multiply => Verb::Multiply,
-                Token::Divide => Verb::Divide,
-                _ => unreachable!(),
-            });
+            };
+            self.advance();
+            operators.push(verb);
             // The AST is still a right-nested tree, which evaluate and drop recurse over.
             if operators.len() >= MAX_CHAIN {
                 return Err(QError::parse("expression too long"));

@@ -76,6 +76,8 @@ Phase 1 of the O language implementation is **complete** with a fully functional
 - ✅ **Atom Types**: Integers, floats, booleans, characters and symbols with q-style type codes
 - ✅ **Vector Literals**: long, float, boolean, symbol and character vectors (strings)
 - ✅ **Vector Arithmetic**: `+ - * %` item by item, with broadcasting of atoms
+- ✅ **Take and join**: `2#1 2 3` is `1 2`, `1 2,3 4` is `1 2 3 4`
+- ✅ **Comparison**: `= <> < <= > >=` on atoms and vectors (`1 2 3 = 1 5 3` is `101b`)
 - ✅ **Interactive REPL**: Full-featured environment with command history and error handling
 - ✅ **File Execution**: Run .o script files with line-by-line execution and error reporting
 - ✅ **Testing**: integration and property tests, plus tests that run every example in the book
@@ -92,10 +94,11 @@ Phase 1 of the O language implementation is **complete** with a fully functional
 
 #### Phase 2: Vectors and Lists (book Chapter 3) 🚧 **IN PROGRESS**
 - ✅ Vector literals (`1 2 3`, `1 2.5 3`, `101b`, `` `a`b ``, `"abc"`), symbol atoms and vector arithmetic
-- ⏳ Vector creation and manipulation (`til`, `count`, take, join)
+- ✅ Take and join (`#`, `,`)
+- ⏳ `til` and `count`
 - ⏳ Indexing and slicing
 - ✅ Vector arithmetic (`+ - * %` on atoms and vectors)
-- ⏳ Comparison in the language (the kernel exists, the parser does not accept `=` `<` yet)
+- ✅ Comparison verbs in the language (`= <> < <= > >=`, giving booleans and boolean vectors)
 - ⏳ Type-preserving operations
 
 #### Phase 3: Dictionaries and Tables (book Chapter 4)
@@ -140,6 +143,12 @@ oxidedb> 1 2.5 3      // A vector literal; one float promotes all
 1 2.5 3
 oxidedb> 1 2 3 + 10   // Arithmetic applies to every item
 11 12 13
+oxidedb> 1 2 3 = 1 5 3   // Comparison gives a boolean vector
+101b
+oxidedb> 5#1 2           // Take wraps around
+1 2 1 2 1
+oxidedb> 1 2,3 4        // Join
+1 2 3 4
 oxidedb> \\
 Goodbye!
 ```
@@ -162,7 +171,7 @@ Complete guide to the O programming language located in `/book/`:
 - **Introduction**: Overview of O and OxideDB
 - **Chapter 1**: Atoms and Basic Arithmetic
 - **Chapter 2**: Variables and Assignment
-- **Chapter 3**: Vectors and Lists (in progress: vector literals and arithmetic)
+- **Chapter 3**: Vectors and Lists (in progress: vector literals, arithmetic, comparison, take and join)
 
 ### Executable Examples
 Run interactive examples from the book:

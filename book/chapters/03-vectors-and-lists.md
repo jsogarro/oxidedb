@@ -1,6 +1,6 @@
 # Chapter 3: Vectors and Lists
 
-So far every value has been a single atom. Real data comes in bunches: a week of temperatures, a column of prices, the names of your customers. O is an array language, so a list of values is as easy to write as a single one, and later chapters build tables and queries out of such lists. This chapter is in progress: it covers how to write vectors, store them and compute with them, and ends with a list of what is still to come.
+So far every value has been a single atom. Real data comes in bunches: a week of temperatures, a column of prices, the names of your customers. O is an array language, so a list of values is as easy to write as a single one, and later chapters build tables and queries out of such lists. This chapter is in progress: it covers how to write vectors, store them, compute with them and compare them, and ends with a list of what is still to come.
 
 ## Why Vectors?
 
@@ -266,6 +266,203 @@ oxidedb> 32 + c * 9 % 5
 ```
 Read right to left: `9 % 5` is `1.8`, `c * 1.8` is `36 45 54`, and adding `32` gives the Fahrenheit temperatures. The result is a float vector whose items are all whole, so it prints with a trailing `f`.
 
+## Comparing
+
+The comparison verbs ask a question about a pair of values and answer with a boolean: `=` (equal), `<>` (not equal), `<` (less), `<=` (at most), `>` (greater) and `>=` (at least). On two atoms the answer is an atom, `1b` for yes and `0b` for no:
+```
+oxidedb> 1 < 2
+1b
+oxidedb> 2 = 3
+0b
+oxidedb> 2 <> 3
+1b
+oxidedb> 5 >= 5
+1b
+```
+They work item by item exactly as the arithmetic verbs do, so with a vector the answer is a **boolean vector**, written glued like `101b`. An atom is compared with every item, and two vectors pair up if they have the same length:
+```
+oxidedb> 1 2 3 = 1 5 3
+101b
+oxidedb> 10 20 30 > 15
+011b
+oxidedb> 15 < 10 20 30
+011b
+oxidedb> 1 2 3 = 1 2
+'length
+```
+The answer is a value like any other, so you can store it:
+```
+oxidedb> v:1 2 3
+1 2 3
+oxidedb> m:v>1
+011b
+oxidedb> m
+011b
+```
+Do not confuse the two jobs of the colon and the equals sign: `x:3` assigns, `x=3` asks whether `x` is 3.
+
+### Still right to left
+There is no precedence among the verbs, comparisons included. `1 < 2 + 3` is `1 < (2 + 3)`, which is what you want. The surprise comes when the comparison is on the right of an arithmetic verb: `2 + 3 > 1` is `2 + (3 > 1)`, and a boolean counts as `0` or `1` in arithmetic, so the answer is a number, not a boolean:
+```
+oxidedb> 1 < 2 + 3
+1b
+oxidedb> 2 + 3 > 1
+3
+oxidedb> (2 + 3) > 1
+1b
+```
+Use parentheses to compare the result of arithmetic on the left. As with arithmetic, a minus glued to a digit after a comparison is a negative number:
+```
+oxidedb> 1 < -2
+0b
+oxidedb> 1 > -2
+1b
+```
+
+### Nulls
+A null equals a null, and it sorts below every other value, so `0N < 1` is true. This is how q behaves, and it differs from the IEEE rule that a not-a-number never equals anything:
+```
+oxidedb> 0N = 0N
+1b
+oxidedb> 0N < 1
+1b
+oxidedb> 1 < 0N
+0b
+oxidedb> 1 0N 3 = 1 0N 4
+110b
+```
+
+### Strings and symbols
+Strings are compared character by character, and symbol vectors symbol by symbol:
+```
+oxidedb> "abc" = "abd"
+110b
+oxidedb> "abc" = "b"
+010b
+oxidedb> `a`b = `a`c
+10b
+oxidedb> `a < `b
+1b
+```
+A character, a symbol and a number are different kinds of value, and comparing across kinds is a `'type` error. This is a deliberate difference from q, which compares a character with a number by its code (`"abc"=1` is `000b` in q):
+```
+oxidedb> "abc" = 1
+'type
+oxidedb> `a = 1
+'type
+```
+
+### Floats are compared exactly
+Floats are compared bit for bit, with no tolerance. Most decimal fractions cannot be stored exactly, so a sum that looks like `0.3` can differ from `0.3` in the last place, and `=` reports it. q compares floats with a small tolerance and says yes here, so this is a deliberate difference from q (`(0.1+0.2)=0.3` is `1b` in q):
+```
+oxidedb> (0.1+0.2) = 0.3
+0b
+oxidedb> (0.1+0.2) < 0.3
+0b
+oxidedb> (0.1+0.2) > 0.3
+1b
+oxidedb> (0.5+0.25) = 0.75
+1b
+```
+Sums of halves and quarters are exact in binary, so that last one is true.
+
+You may be tempted to count how many items match, for example how many entries of `v>1` are true. That needs a way to add up a vector, which does not exist yet, so for now the boolean vector is the answer.
+
+## Take (`#`)
+
+`n # v` takes the first `n` items of `v`. The count goes on the left, the list on the right:
+```
+oxidedb> 2#1 2 3
+1 2
+oxidedb> 3#"hello"
+"hel"
+```
+If the count is larger than the list, take wraps around and starts again. A negative count takes from the end, and wraps the same way:
+```
+oxidedb> 5#1 2
+1 2 1 2 1
+oxidedb> -2#1 2 3
+2 3
+oxidedb> -5#1 2 3
+2 3 1 2 3
+```
+Taking nothing keeps the type, and the display of an empty typed vector says which type it is:
+```
+oxidedb> 0#1 2
+`long$()
+oxidedb> 0#`a`b
+`symbol$()
+oxidedb> 0#"ab"
+""
+```
+Taking from an atom repeats it, which is the easy way to make a constant vector. A negative count of an atom gives the same thing, and `-1#7` is a one-item vector (it prints with a leading comma):
+```
+oxidedb> 3#7
+7 7 7
+oxidedb> 3#"a"
+"aaa"
+oxidedb> 3#`a
+`a`a`a
+oxidedb> -1#7
+,7
+```
+Like every verb, take is right to left, so `2#1 2 3 + 1` is `2#(1 2 3 + 1)`. The count must be a long (a float count is a `'type` error). A list of counts would reshape the data into rows, which O does not do yet, and a count above 10,000,000 items is a `'domain` error (an O limit; q would try to allocate):
+```
+oxidedb> 2#1 2 3 + 1
+2 3
+oxidedb> 2.0#1 2 3
+'type
+oxidedb> 1 2#1 2 3
+'nyi: reshape
+oxidedb> 1000000000#1
+'domain
+```
+
+## Join (`,`)
+
+`x , y` puts two lists end to end. An atom counts as a one-item list:
+```
+oxidedb> 1 2,3 4
+1 2 3 4
+oxidedb> 1,2 3
+1 2 3
+oxidedb> 1 2,3
+1 2 3
+oxidedb> "ab","c"
+"abc"
+oxidedb> `a`b,`c
+`a`b`c
+```
+An empty list on either side disappears:
+```
+oxidedb> 1 2,0#1 2
+1 2
+oxidedb> (0#1 2),1 2
+1 2
+```
+Join **never converts types**. When the two sides have the same type the result is a vector, but joining a long with a float gives a *general list*, a list whose items keep their own types, not a float vector. A general list is displayed one item per line (O's display of nested lists will be refined later), and you cannot yet type one directly:
+```
+oxidedb> 1,2.5
+1
+2.5
+oxidedb> 1 2,3.0
+1
+2
+3f
+oxidedb> 1,"a"
+1
+"a"
+```
+This is the same in q. Compare this with the literal `1 2.5`, which the reader promotes to a float vector before join is ever involved. And because `,` is just another verb, the right-to-left rule applies: `1 2,3 = 3` is `1 2,(3 = 3)`, a long vector joined to a boolean, so it is a general list too, while `(1 2,3) = 1 2 4` compares the joined vector:
+```
+oxidedb> 1 2,3 = 3
+1
+2
+1b
+oxidedb> (1 2,3) = 1 2 4
+110b
+```
+
 ## Unfinished Business
 
 Three things that look like they should work are not supported yet. Each gives a clear error rather than a wrong answer.
@@ -298,8 +495,6 @@ These parts of the chapter will be added as the features arrive. None of them wo
 
 - `til` and `count`
 - indexing a vector
-- take (`#`) and join (`,`)
-- comparisons that return boolean vectors
 - general (mixed or nested) lists, written with parentheses and semicolons
 - assigning to an item of a vector
 
@@ -313,6 +508,7 @@ These parts of the chapter will be added as the features arrive. None of them wo
 6. Predict the output of `5 0N 2.5`, then run it.
 7. A shop sells three items at prices `p:10 20 30` in quantities `q:1 2 3`. Write the expression for the cost of each line (price times quantity), then the cost of each line with a flat fee of 5 added.
 8. Predict `10 20 30 - 1 2 3 * 2`, then `(10 20 30 - 1 2 3) * 2`. Which one subtracts first?
+9. Predict `5 3 8 > 4`, then store the answer in `big`. What does `3 > 2 + 5` print, and why is `3 + 2 > 5` not a boolean?
 
 ## Key Takeaways
 
@@ -324,5 +520,7 @@ These parts of the chapter will be added as the features arrive. None of them wo
 - Two values side by side that are not one literal are application, which is not built yet (`x -1` is the classic surprise)
 - Variables hold vectors, and reading one does not copy it
 - A null inside a float vector is `0n`
+- `= <> < <= > >=` compare item by item and give booleans (`1b`, or a boolean vector like `101b`); null equals null and sorts lowest; comparing across kinds is `'type`; `=` asks, `:` assigns
 - `+ - * %` work item by item on vectors: an atom is paired with every item, two vectors pair up if they have the same length (`'length` otherwise), `%` gives floats, and symbols and strings are `'type`
+- `n#v` takes the first `n` items (wrapping; negative from the end; an atom repeats); `x,y` joins and never converts types, so `1,2.5` is a general list; `!` and reshape are still to come
 - Indexing, `til`, `count` and the rest are still to come

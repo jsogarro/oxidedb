@@ -160,6 +160,181 @@ tags:`red`green
 // Expected output: 5
 x:5
 
+// Comparing: booleans, and boolean vectors for vectors
+// Expected output: 1b
+1 < 2
+
+// Expected output: 0b
+2 = 3
+
+// Expected output: 1b
+2 <> 3
+
+// Expected output: 1b
+5 >= 5
+
+// Expected output: 101b
+1 2 3 = 1 5 3
+
+// Expected output: 011b
+10 20 30 > 15
+
+// Expected output: 011b
+15 < 10 20 30
+
+// Expected output: 011b
+m:v>1
+
+// Expected output: 011b
+m
+
+// Right to left: 1 < (2 + 3), and 2 + (3 > 1)
+// Expected output: 1b
+1 < 2 + 3
+
+// Expected output: 3
+2 + 3 > 1
+
+// Expected output: 1b
+(2 + 3) > 1
+
+// Expected output: 0b
+1 < -2
+
+// Expected output: 1b
+1 > -2
+
+// Nulls equal nulls and sort lowest
+// Expected output: 1b
+0N = 0N
+
+// Expected output: 1b
+0N < 1
+
+// Expected output: 0b
+1 < 0N
+
+// Expected output: 110b
+1 0N 3 = 1 0N 4
+
+// Strings and symbols compare item by item
+// Expected output: 110b
+"abc" = "abd"
+
+// Expected output: 010b
+"abc" = "b"
+
+// Expected output: 10b
+`a`b = `a`c
+
+// Expected output: 1b
+`a < `b
+
+// Exercise 9
+// Expected output: 101b
+big:5 3 8 > 4
+
+// Floats are compared exactly (q is tolerant: its (0.1+0.2)=0.3 is 1b)
+// Expected output: 0b
+(0.1+0.2) = 0.3
+
+// Expected output: 1b
+(0.1+0.2) > 0.3
+
+// Expected output: 1b
+(0.5+0.25) = 0.75
+
+// Take
+// Expected output: 1 2
+2#1 2 3
+
+// Expected output: "hel"
+3#"hello"
+
+// Expected output: 1 2 1 2 1
+5#1 2
+
+// Expected output: 2 3
+-2#1 2 3
+
+// Expected output: 2 3 1 2 3
+-5#1 2 3
+
+// Expected output: `long$()
+0#1 2
+
+// Expected output: `symbol$()
+0#`a`b
+
+// Expected output: ""
+0#"ab"
+
+// Expected output: 7 7 7
+3#7
+
+// Expected output: "aaa"
+3#"a"
+
+// Expected output: `a`a`a
+3#`a
+
+// Expected output: ,7
+-1#7
+
+// Expected output: 2 3
+2#1 2 3 + 1
+
+// Join
+// Expected output: 1 2 3 4
+1 2,3 4
+
+// Expected output: 1 2 3
+1,2 3
+
+// Expected output: 1 2 3
+1 2,3
+
+// Expected output: "abc"
+"ab","c"
+
+// Expected output: `a`b`c
+`a`b,`c
+
+// Expected output: 1 2
+1 2,0#1 2
+
+// Expected output: 1 2
+(0#1 2),1 2
+
+// (Join never converts types: 1,2.5 is a general list, shown one item per line in the chapter.)
+// Expected output: 110b
+(1 2,3) = 1 2 4
+
+// Exercises 10 to 14
+// Expected output: 2 1 2
+-3#1 2
+
+// Expected output: `b`c`b`c
+4#`b`c
+
+// Expected output: `float$()
+0#1 2.5
+
+// Expected output: 2 4 5 4
+2,3#4 5
+
+// Expected output: 7 7 7 7
+4#7
+
+// Expected output: 1 2 1 2 1 2
+6#1 2
+
+// Expected output: 0b
+(0.2+0.1) = 0.3
+
+// Expected output: 1b
+(0.5+0.5) = 1.0
+
 // Exercise: Celsius to Fahrenheit, right to left
 // Expected output: 20 25 30
 c:20 25 30
