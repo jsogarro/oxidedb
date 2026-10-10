@@ -4,12 +4,7 @@ This directory contains executable O files (.o extension) demonstrating the conc
 
 ## How to Run Examples
 
-To execute an O file:
-```bash
-cargo run -- examples/filename.o
-```
-
-Or from the project root:
+To execute an O file, from the project root:
 ```bash
 cargo run -- book/examples/filename.o
 ```
@@ -36,14 +31,18 @@ The O interpreter will:
 ## Example Output
 
 When you run an example file, you'll see output like:
-```
+```text
 $ cargo run -- book/examples/01-atoms-and-arithmetic.o
-OxideDB - Executing book/examples/01-atoms-and-arithmetic.o
 42
 -17
 0
 3.14159
+-2.5
 ...
 ```
 
 Each line of output corresponds to the result of executing an O expression from the file.
+
+## Checking the Examples
+
+`cargo test --test book_examples` runs each file in its own interpreter session. The next line that prints something after a `// Expected output: X` comment must print exactly `X`. Put any explanation on a separate comment line, and keep the marker in that exact form: a misspelled marker fails the test.

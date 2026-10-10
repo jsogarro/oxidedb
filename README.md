@@ -1,6 +1,6 @@
 # OxideDB (ODB)
 
-A high-performance columnar database with an integrated array programming language called **O**, inspired by Q/KDB+, implemented in Rust.
+An experimental, Q/KDB+-inspired expression interpreter written in Rust. It implements the array programming language **O**; the columnar database engine is planned and not built yet.
 
 ## Overview
 
@@ -11,16 +11,16 @@ OxideDB aims to provide the power and expressiveness of Q/KDB+ with Rust's memor
 - **O Programming Language**: Q-inspired array programming language with right-to-left evaluation
 - **Interactive REPL**: Full-featured Read-Eval-Print Loop with command history
 - **File Execution**: Run O scripts directly from files (.o extension)
-- **Variable System**: Persistent variable storage and retrieval
-- **Type System**: Support for integers, floats, booleans, characters, and symbols
+- **Variable System**: Named values held in memory for the length of a session (nothing is saved to disk; REPL input history is kept in `~/.oxidedb_history`)
+- **Type System**: Integers, floats, booleans and characters (symbol literals are not implemented yet)
 - **Comprehensive Documentation**: "O for Humans" book with executable examples
-- **Memory Safety**: Built with Rust's ownership model for reliable performance
+- **Memory Safety**: Written in safe Rust
 
 ## Quick Start
 
 ### Prerequisites
 
-- Rust 1.70 or later
+- Rust 1.78 or later (`Cargo.lock` is version 4)
 - Cargo
 
 ### Building
@@ -53,7 +53,7 @@ cargo run -- path/to/your/script.o
 ### Running Tests
 
 ```bash
-# Run all tests (14 passing tests including variable features)
+# Run all tests
 cargo test
 
 # Run integration tests
@@ -71,12 +71,12 @@ Phase 1 of the O language implementation is **complete** with a fully functional
 
 - ✅ **Complete O Language Parser**: Lexer, parser, and AST generation for O syntax
 - ✅ **Right-to-Left Evaluation**: Proper Q-style expression evaluation (e.g., `1 + 2 * 3` = `7`)
-- ✅ **Variable System**: Assignment (`x:5`) and retrieval with persistent storage
-- ✅ **Atom Types**: Integers, floats, booleans, characters, and symbols with proper type codes
+- ✅ **Variable System**: Assignment (`x:5`) and retrieval, held in memory for the session
+- ✅ **Atom Types**: Integers, floats, booleans and characters with q-style type codes
 - ✅ **Interactive REPL**: Full-featured environment with command history and error handling
 - ✅ **File Execution**: Run .o script files with line-by-line execution and error reporting
-- ✅ **Comprehensive Testing**: 14 test cases covering all implemented features
-- ✅ **Performance Benchmarks**: Sub-microsecond execution times for basic operations
+- ✅ **Testing**: integration and property tests, plus tests that run every example in the book
+- ✅ **Benchmarks**: Criterion benchmarks for basic operations (`cargo bench`)
 - ✅ **Documentation**: "O for Humans" book with executable examples
 
 ### Roadmap
@@ -87,19 +87,19 @@ Phase 1 of the O language implementation is **complete** with a fully functional
 - ✅ Variable assignment and retrieval (`:` operator)
 - ✅ Interactive REPL with file execution support
 
-#### Phase 2: Vectors and Lists (Chapter 4)
+#### Phase 2: Vectors and Lists (book Chapter 3)
 - ⏳ Vector creation and manipulation
 - ⏳ Indexing and slicing
 - ⏳ Basic vector operations (arithmetic, comparison)
 - ⏳ Type-preserving operations
 
-#### Phase 3: Dictionaries and Tables (Chapters 5-6)
+#### Phase 3: Dictionaries and Tables (book Chapter 4)
 - ⏳ Dictionary implementation
 - ⏳ Table as collection of named columns
 - ⏳ Basic table operations (select, update, insert)
 - ⏳ Simple queries
 
-#### Phase 4: Functions and Control Flow (Chapters 7-8)
+#### Phase 4: Functions and Control Flow (book Chapter 5)
 - ⏳ Function definition and application
 - ⏳ Conditionals and loops
 - ⏳ Error handling
@@ -107,7 +107,7 @@ Phase 1 of the O language implementation is **complete** with a fully functional
 
 #### Phase 5: Advanced Features
 - ⏳ Temporal types and operations
-- ⏳ File I/O and persistence
+- ⏳ File I/O and persistence (variables are not saved yet)
 - ⏳ Inter-process communication
 - ⏳ Performance optimizations
 
@@ -129,23 +129,21 @@ oxidedb> y:x*2        // Using variables
 20
 oxidedb> y
 20
-oxidedb> 2.5 + 1.5    // Mixed arithmetic
+oxidedb> 2.5 + 1.5    // Float arithmetic
 4f
-oxidedb> \\           // Q-style exit
+oxidedb> \\
 Goodbye!
 ```
 
 ### File Execution
 ```bash
 $ cargo run -- book/examples/01-atoms-and-arithmetic.o
-OxideDB - Executing book/examples/01-atoms-and-arithmetic.o
 42
 -17
+0
 3.14159
-1b
-"a"
-5
-# ... more output
+-2.5
+...
 ```
 
 ## Learning O
@@ -168,7 +166,7 @@ cargo run -- book/examples/02-variables-and-assignment.o
 The codebase is organized into several modules:
 
 - `language/`: Lexer, parser, AST, and interpreter for O language
-- `types/`: Core data types (atoms, vectors, dictionaries, tables)
+- `types/`: Core data types (atoms are implemented; vectors, dictionaries and tables are placeholders)
 - `repl/`: Interactive REPL interface with file execution support
 - `book/`: Complete "O for Humans" documentation and examples
 
