@@ -1,6 +1,6 @@
-use oxidedb::{Atom, Interpreter, Lexer, Parser};
+use oxidedb::{Atom, Interpreter, Lexer, Parser, Value};
 
-fn eval(src: &str) -> anyhow::Result<Atom> {
+fn eval(src: &str) -> anyhow::Result<Value> {
     let tokens = Lexer::new(src).tokenize()?;
     let ast = Parser::new(tokens).parse()?;
     Ok(Interpreter::new().evaluate(ast)?)

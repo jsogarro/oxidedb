@@ -1,5 +1,5 @@
 use oxidedb::language::lexer::Token;
-use oxidedb::{Atom, Interpreter, Lexer, Parser};
+use oxidedb::{Atom, Interpreter, Lexer, Parser, Value};
 
 fn lex(src: &str) -> Vec<Token> {
     let mut tokens = Lexer::new(src).tokenize().unwrap();
@@ -7,7 +7,7 @@ fn lex(src: &str) -> Vec<Token> {
     tokens
 }
 
-fn eval(interp: &mut Interpreter, src: &str) -> Atom {
+fn eval(interp: &mut Interpreter, src: &str) -> Value {
     let tokens = Lexer::new(src).tokenize().unwrap();
     let ast = Parser::new(tokens).parse().unwrap();
     interp.evaluate(ast).unwrap()
@@ -66,7 +66,7 @@ fn neg_literal_keeps_arithmetic() {
 }
 
 #[test]
-fn lex_bool_only_for_single_digit() {
+fn lex_digit_then_b_identifier_is_not_boolean() {
     let sym = |s: &str| Token::Symbol(s.into());
     // `10b` is a boolean vector now (see tests/lex_lists.rs).
     assert_eq!(lex("10b"), vec![Token::BoolList(vec![true, false])]);

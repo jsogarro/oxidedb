@@ -1,7 +1,7 @@
 //! Symbol, string and boolean-vector literal tokens (lexer only; the parser
 //! still reports them as not yet implemented).
 use oxidedb::language::lexer::Token;
-use oxidedb::{Interpreter, Lexer, QError};
+use oxidedb::{Atom, Interpreter, Lexer, QError};
 
 fn lex(src: &str) -> Vec<Token> {
     let mut tokens = Lexer::new(src).tokenize().unwrap();
@@ -58,7 +58,8 @@ fn lex_lists_string() {
     assert_eq!(lex("\"a b\""), vec![Token::Str("a b".into())]);
     assert_eq!(lex("\"a\""), vec![Token::Character('a')]);
     assert_eq!(lex("\"é\""), vec![Token::Character('é')]);
-    assert_eq!(lex("\"\"\""), vec![Token::Character('"')]);
+    // no special case for `"""`: an empty string, then an unterminated one
+    assert_eq!(lex_err("\"\"\""), parse("unterminated character literal"));
 }
 
 #[test]
@@ -185,4 +186,130 @@ fn lex_lists_display_source_form() {
         r#""a\"b\\c\nd\te\rf""#
     );
     assert_eq!(Token::BoolList(vec![true, false, true]).to_string(), "101b");
+}
+
+#[test]
+fn lex_lists_escapes_evaluate_as_characters() {
+    for (src, c) in [
+        (r#""\n""#, '\n'),
+        (r#""\t""#, '\t'),
+        (r#""\r""#, '\r'),
+        (r#""\\""#, '\\'),
+        (r#""\"""#, '"'),
+    ] {
+        let value = Interpreter::new().eval_line(src).unwrap().unwrap();
+        assert_eq!(value, Atom::Character(c), "{src}");
+    }
+    // quote, backslash, quote: the backslash escapes the closing quote
+    assert_eq!(
+        Interpreter::new().eval_line(r#""\""#).unwrap_err(),
+        parse("unterminated character literal")
+    );
+}
+
+#[test]
+fn lex_lists_literals_end_at_a_boundary() {
+    // (source, text of the literal that ends too early)
+    for (src, lit) in [
+        ("1.5.5", "1.5"),
+        ("1..5", "1."),
+        (".5.5", ".5"),
+        ("1e3.5", "1e3"),
+        ("\"ab\"\"cd\"", "\"ab\""),
+        ("\"ab\"1", "\"ab\""),
+        ("1\"ab\"", "1"),
+        ("10b.5", "10b"),
+        ("`a\"b\"", "`a"),
+        ("\"a\"`b", "\"a\""),
+        ("\"a\"\"b\"", "\"a\""),
+        ("1`a", "1"),
+        ("1b`a", "1b"),
+        ("101b\"a\"", "101b"),
+        ("`a`b\"c\"", "`a`b"),
+    ] {
+        assert_eq!(
+            lex_err(src),
+            parse(&format!("invalid literal: {lit}...")),
+            "{src}"
+        );
+    }
+    assert_eq!(lex_err("101b1"), parse("invalid literal: 101b..."));
+    // an operator, bracket or space after a literal is fine, as is an
+    // identifier before a symbol
+    assert_eq!(lex("1.5 .5"), vec![Token::Float(1.5), Token::Float(0.5)]);
+    assert_eq!(
+        lex("\"ab\" \"cd\""),
+        vec![Token::Str("ab".into()), Token::Str("cd".into())]
+    );
+    assert_eq!(lex("`a)"), vec![sym("a"), Token::RightParen]);
+    assert_eq!(
+        lex("(\"ab\")"),
+        vec![Token::LeftParen, Token::Str("ab".into()), Token::RightParen]
+    );
+    assert_eq!(
+        lex("1.5+.5"),
+        vec![Token::Float(1.5), Token::Plus, Token::Float(0.5)]
+    );
+    assert_eq!(lex("x`a"), vec![Token::Symbol("x".into()), sym("a")]);
+    assert_eq!(
+        lex("`a[1]"),
+        vec![
+            sym("a"),
+            Token::LeftBracket,
+            Token::Integer(1),
+            Token::RightBracket
+        ]
+    );
+}
+
+#[test]
+fn lex_lists_minus_never_folds_into_a_boolean() {
+    assert_eq!(lex("-1b"), vec![Token::Minus, Token::Boolean(true)]);
+    assert_eq!(lex("-0b"), vec![Token::Minus, Token::Boolean(false)]);
+    assert_eq!(
+        lex("-101b"),
+        vec![Token::Minus, Token::BoolList(vec![true, false, true])]
+    );
+    assert_eq!(
+        lex("-10b"),
+        vec![Token::Minus, Token::BoolList(vec![true, false])]
+    );
+    assert_eq!(
+        lex("2 -1b"),
+        vec![Token::Integer(2), Token::Minus, Token::Boolean(true)]
+    );
+    // still a number when no boolean follows
+    assert_eq!(
+        lex("-1bc"),
+        vec![Token::Integer(-1), Token::Symbol("bc".into())]
+    );
+    assert_eq!(lex("-12"), vec![Token::Integer(-12)]);
+}
+
+#[test]
+fn lex_lists_numbers_glued_to_b_are_invalid() {
+    for (src, lit) in [
+        ("1.0b", "1.0"),
+        ("1e3b", "1e3"),
+        ("1.b", "1."),
+        ("2b", "2"),
+        ("102b", "102"),
+        ("-2b", "2"),
+    ] {
+        assert_eq!(
+            lex_err(src),
+            parse(&format!("invalid literal: {lit}b...")),
+            "{src}"
+        );
+    }
+}
+
+#[test]
+fn lex_lists_symbol_names_are_ascii() {
+    let msg = "invalid symbol: non-ASCII character 'é'; symbol names are ASCII letters, digits, '_' and '.'";
+    assert_eq!(lex_err("`é"), parse(msg));
+    assert_eq!(lex_err("`aé"), parse(msg));
+    assert_eq!(lex_err("`a`é"), parse(msg));
+    // `_` is a valid name character, not an identifier start error
+    assert_eq!(lex("`_a"), vec![sym("_a")]);
 }

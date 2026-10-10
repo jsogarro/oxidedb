@@ -1,12 +1,15 @@
 use oxidedb::language::lexer::Token;
-use oxidedb::{Atom, Interpreter, Lexer, Parser};
+use oxidedb::{Atom, Interpreter, Lexer, Parser, Value};
 
 const N: usize = 200_000;
 
 fn run(interp: &mut Interpreter, src: &str) -> anyhow::Result<Atom> {
     let tokens = Lexer::new(src).tokenize()?;
     let ast = Parser::new(tokens).parse()?;
-    Ok(interp.evaluate(ast)?)
+    match interp.evaluate(ast)? {
+        Value::Atom(a) => Ok(a),
+        v => anyhow::bail!("not an atom: {v}"),
+    }
 }
 
 fn eval(src: &str) -> anyhow::Result<Atom> {

@@ -193,3 +193,15 @@ fn vector_get_at_len_is_null_for_every_type() {
         Atom::Symbol(sym("b"))
     );
 }
+
+#[test]
+fn vector_mixed_list_has_type_zero() {
+    use oxidedb::Value;
+    use std::rc::Rc;
+    let mixed = vec![Value::Atom(Atom::Integer(1)), Value::Atom(Atom::Float(2.0))];
+    // Mixed atoms never become a column; the result is a general list, type 0.
+    assert!(Column::from_atoms(&[Atom::Integer(1), Atom::Float(2.0)]).is_none());
+    let v = Value::from_items(mixed.clone());
+    assert_eq!(v, Value::List(Rc::new(mixed)));
+    assert_eq!(v.type_code(), 0);
+}
