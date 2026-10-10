@@ -37,6 +37,12 @@ fn nyi_token(token: &Token) -> Option<QError> {
     Some(QError::Nyi(detail))
 }
 
+/// What sits between two operands of a chain.
+enum Join {
+    Verb(Verb),
+    Apply,
+}
+
 /// The binary verb a token spells, if any.
 fn verb_of(token: &Token) -> Option<Verb> {
     Some(match token {
@@ -139,6 +145,10 @@ impl Parser {
             }
         }
 
+        if matches!(expr, Expr::Apply { .. }) && self.check(&Token::Colon) {
+            return Err(QError::Nyi("index assignment".into()));
+        }
+
         Ok(expr)
     }
 
@@ -146,7 +156,7 @@ impl Parser {
         // Parsed iteratively so a long flat chain does not consume parser depth;
         // folded from the right into the same right-associative AST.
         let mut operands = Vec::new();
-        let mut operators = Vec::new();
+        let mut joins = Vec::new();
         loop {
             let mut operand = self.unary()?;
             // An assignment in operand position (`x+y:2`) takes the rest of the input.
@@ -160,28 +170,36 @@ impl Parser {
                     };
                 }
             }
-            // A noun straight after a noun is application (`x 1`, `1 "a"`), not built yet.
-            if starts_noun(self.peek()) {
-                return Err(QError::Nyi("application".into()));
-            }
             operands.push(operand);
-            let Some(verb) = verb_of(self.peek()) else {
+            // A verb joins two operands; a noun straight after a noun is application.
+            // Both fold from the right, so `v 0 + 1` is `v (0 + 1)`.
+            let join = if let Some(verb) = verb_of(self.peek()) {
+                self.advance();
+                Join::Verb(verb)
+            } else if starts_noun(self.peek()) {
+                Join::Apply
+            } else {
                 break;
             };
-            self.advance();
-            operators.push(verb);
+            joins.push(join);
             // The AST is still a right-nested tree, which evaluate and drop recurse over.
-            if operators.len() >= MAX_CHAIN {
+            if joins.len() >= MAX_CHAIN {
                 return Err(QError::parse("expression too long"));
             }
         }
         let mut right = operands.pop().expect("at least one operand");
-        while let Some(operator) = operators.pop() {
-            let left = operands.pop().expect("operand per operator");
-            right = Expr::BinaryOp {
-                left: Box::new(left),
-                operator,
-                right: Box::new(right),
+        while let Some(join) = joins.pop() {
+            let left = Box::new(operands.pop().expect("operand per join"));
+            right = match join {
+                Join::Verb(operator) => Expr::BinaryOp {
+                    left,
+                    operator,
+                    right: Box::new(right),
+                },
+                Join::Apply => Expr::Apply {
+                    func: left,
+                    args: vec![right],
+                },
             };
         }
         Ok(right)
@@ -200,7 +218,46 @@ impl Parser {
         self.primary()
     }
 
+    /// A noun and any `[...]` after it (`v[0 2][1]`); brackets bind tighter than juxtaposition.
     fn primary(&mut self) -> QResult<Expr> {
+        let mut term = self.noun()?;
+        let mut links = 0;
+        while self.match_tokens(&[Token::LeftBracket]) {
+            links += 1;
+            if links >= MAX_CHAIN {
+                return Err(QError::parse("expression too long"));
+            }
+            let args = self.bracket_args()?;
+            term = Expr::Apply {
+                func: Box::new(term),
+                args,
+            };
+        }
+        Ok(term)
+    }
+
+    /// Arguments up to the closing `]`, separated by `;`; the `[` is already read.
+    fn bracket_args(&mut self) -> QResult<Vec<Expr>> {
+        let mut args = Vec::new();
+        if self.match_tokens(&[Token::RightBracket]) {
+            return Ok(args);
+        }
+        loop {
+            if self.check(&Token::Semicolon) || self.check(&Token::RightBracket) {
+                return Err(QError::Nyi("elided argument".into()));
+            }
+            args.push(self.expression()?);
+            if self.match_tokens(&[Token::RightBracket]) {
+                return Ok(args);
+            }
+            if !self.match_tokens(&[Token::Semicolon]) {
+                return Err(nyi_token(self.peek())
+                    .unwrap_or_else(|| QError::parse("expected ']' after arguments")));
+            }
+        }
+    }
+
+    fn noun(&mut self) -> QResult<Expr> {
         if self.is_at_end() {
             return Err(QError::parse("unexpected end of input"));
         }

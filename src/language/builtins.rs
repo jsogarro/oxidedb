@@ -1,7 +1,8 @@
-//! Named builtin functions (`til`, `count`). The interpreter resolves a name
+//! Named builtin functions (`til`, `count`, `neg`). The interpreter resolves a name
 //! to a builtin after variables, then calls it with already-evaluated args.
 
 use crate::error::{QError, QResult};
+use crate::language::ops;
 use crate::types::atom::Atom;
 use crate::types::column::{checked_len, Column};
 use crate::types::value::Value;
@@ -11,12 +12,14 @@ use std::rc::Rc;
 pub enum Builtin {
     Til,
     Count,
+    Neg,
 }
 
 pub fn lookup(name: &str) -> Option<Builtin> {
     match name {
         "til" => Some(Builtin::Til),
         "count" => Some(Builtin::Count),
+        "neg" => Some(Builtin::Neg),
         _ => None,
     }
 }
@@ -26,12 +29,13 @@ impl Builtin {
         match self {
             Builtin::Til => "til",
             Builtin::Count => "count",
+            Builtin::Neg => "neg",
         }
     }
 
     pub fn arity(self) -> usize {
         match self {
-            Builtin::Til | Builtin::Count => 1,
+            Builtin::Til | Builtin::Count | Builtin::Neg => 1,
         }
     }
 
@@ -43,6 +47,7 @@ impl Builtin {
         match self {
             Builtin::Til => til(&args[0]),
             Builtin::Count => Ok(count(&args[0])),
+            Builtin::Neg => ops::monad_neg(&args[0]),
         }
     }
 }

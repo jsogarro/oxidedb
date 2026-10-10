@@ -14,6 +14,11 @@ pub enum Expr {
         operator: UnaryOperator,
         operand: Box<Expr>,
     },
+    /// `f x`, `f[x]`, `v i`, `v[i;j]`: the arguments are already in source order.
+    Apply {
+        func: Box<Expr>,
+        args: Vec<Expr>,
+    },
     Assignment {
         name: String,
         value: Box<Expr>,

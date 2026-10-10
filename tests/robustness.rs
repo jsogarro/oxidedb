@@ -9,7 +9,9 @@ fn operand() -> impl Strategy<Value = String> {
         6 => prop::sample::select(&[
             "0", "00", "0.", "1", "1.5", "42", "9223372036854775807", "9223372036854775808",
             "-9223372036854775808", "1b", "0b", "-1", "0N", "0n", "0w", "-0w", "1e3", "1e-3", "1f",
-            "0W", "1e", "1F", "1 2 3", "1 2.5 3", "1 -2", "0N 0n", "1 0N", "101b", "`a`b", "`a",
+            "0W", "1e", "1F", "1 2 3", "1 2.5 3", "1 -2", "0N 0n", "1 0N", "101b", "`a`b",
+            "til 3", "count til 4", "neg 1 2", "1 2 3[1]", "(1 2 3)[0 5]", "til[2]", "count[1;2]",
+            "1 2 3 1", "\"abc\" 0 7", "neg 0N", "til -1", "til 0N", "`a",
             "\"abc\"", "1 1b", "1 \"a\"", "1f 2", "1 2 3f", "1 2 + 3 4",
         ][..]).prop_map(String::from),
         2 => prop::sample::select(&["a", "é", "_", "x1", "日本"][..]).prop_map(String::from),
@@ -134,6 +136,35 @@ proptest! {
     ) {
         let src: String = v.iter().map(|&(n, o)| format!("{}{}", NUMS[n], OPS[o])).collect();
         pipeline(&format!("{src}1"));
+    }
+}
+
+const APPLY: &[&str] = &[
+    "til", "count", "neg", "x", "v", "1", "0", "-1", "1 2", "0N", "`a", "\"ab\"", "101b", "3.5",
+    "(", ")", "[", "]", ";", "+", "-", "=", ",", ":", "x:", "v:1 2 3",
+];
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(1024))]
+
+    // Juxtaposition, brackets and builtin names in any order: never a panic.
+    #[test]
+    fn application_soup_never_panics(v in proptest::collection::vec(0..APPLY.len(), 0..=14)) {
+        let toks: Vec<&str> = v.iter().map(|&i| APPLY[i]).collect();
+        pipeline(&toks.join(" "));
+        pipeline(&toks.concat());
+    }
+
+    // The same with `v` and `x` bound, so indexing paths run too.
+    #[test]
+    fn application_with_bindings_never_panics(v in proptest::collection::vec(0..APPLY.len(), 0..=14)) {
+        let mut interp = Interpreter::new();
+        let _ = interp.eval_line("v:10 20 30");
+        let _ = interp.eval_line("x:5");
+        let toks: Vec<&str> = v.iter().map(|&i| APPLY[i]).collect();
+        if let Ok(Some(value)) = interp.eval_line(&toks.join(" ")) {
+            let _ = value.to_string();
+        }
     }
 }
 

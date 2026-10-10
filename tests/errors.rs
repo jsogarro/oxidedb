@@ -133,9 +133,9 @@ fn errors_token_source_form() {
     }
     // as they appear in messages
     let msgs = [
-        ("1 1b", "'nyi: application"),
-        ("1 x", "'nyi: application"),
-        ("1 \"a\"", "'nyi: application"),
+        ("1 1b", "'type"),
+        ("1 x", "'x (Undefined variable)"),
+        ("1 \"a\"", "'type"),
         ("1 )", "'parse: unexpected ) after expression"),
         ("1 ]", "'parse: unexpected ] after expression"),
     ];

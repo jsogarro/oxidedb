@@ -234,6 +234,169 @@ m
 // Expected output: 101b
 big:5 3 8 > 4
 
+// The classic trap: a name followed by a negative literal is application (indexing)
+// Expected output: 1 2 3
+x:1 2 3
+
+// Expected output: 0N
+x -1
+
+// Expected output: 0 1 2
+x - 1
+
+// Expected output: 0 1 2
+x-1
+
+// Expected output: 1
+x -1 + 1
+
+// neg is q's negation keyword
+// Expected output: -5
+neg 5
+
+// Expected output: -1 -2 -3
+neg 1 2 3
+
+// Expected output: -1
+neg 1b
+
+// Expected output: 0N
+neg 0N
+
+// Expected output: -1
+1 + neg 2
+
+// Expected output: -3
+neg 1 + 2
+
+// til and count: a name applies to everything on its right
+// Expected output: 0 1 2 3 4
+til 5
+
+// Expected output: 3
+count 1 2 3
+
+// Expected output: 5
+count "hello"
+
+// Expected output: 1
+count 7
+
+// Expected output: 0 1 2 3 4
+til 3+2
+
+// Expected output: 2 3 4
+(til 3) + 2
+
+// Expected output: 5
+count til 5
+
+// Expected output: 5
+count til 3 + 2
+
+// Expected output: 0 10 20
+10 * til 3
+
+// Expected output: 0 1 2 3 4
+til[5]
+
+// Indexing
+// Expected output: 10 20 30
+v:10 20 30
+
+// Expected output: 20
+v[1]
+
+// Expected output: 20
+v 1
+
+// Expected output: 10 30
+v[0 2]
+
+// Expected output: 10 30
+v 0 2
+
+// Expected output: 10 20 30
+v[til 3]
+
+// Expected output: 2
+i:2
+
+// Expected output: 30
+v i
+
+// Expected output: 30 20 10 10
+v[2 1 0 0]
+
+// Expected output: "b"
+"abc" 1
+
+// Expected output: "ac"
+"abc" 0 2
+
+// Expected output: `c
+`a`b`c 2
+
+// Out of range gives the type's null
+// Expected output: 0N
+v[5]
+
+// Expected output: 0N
+v[3]
+
+// Expected output: 0N
+v[-1]
+
+// Expected output: 20 0N
+v[1 5]
+
+// Expected output: `
+`a`b[5]
+
+// Expected output: " "
+"abc"[5]
+
+// Expected output: 0n
+1.5 2.5[5]
+
+// Expected output: 0b
+101b[7]
+
+// Brackets bind tighter than juxtaposition
+// Expected output: 11
+v[0] + 1
+
+// Expected output: 20
+v 0 + 1
+
+// Expected output: 30
+v[0 2][1]
+
+// Expected output: 10
+v[1 > 10]
+
+// The argument is evaluated first
+// Expected output: 20
+v[j:1]
+
+// Expected output: 1
+j
+
+// Empty brackets give the vector back
+// Expected output: 10 20 30
+v[]
+
+// Exercise 11: the last item
+// Expected output: 10 20 30 40 50
+v:10 20 30 40 50
+
+// Expected output: 50
+v[-1 + count v]
+
+// Exercise 12: out of range and negative indexes are nulls
+// Expected output: 20 0N 0N
+v[1 7 -1]
+
 // Exercise: Celsius to Fahrenheit, right to left
 // Expected output: 20 25 30
 c:20 25 30
