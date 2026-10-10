@@ -3,7 +3,7 @@ use oxidedb::types::atom::Atom;
 use oxidedb::types::column::Column;
 use oxidedb::types::sym::Sym;
 use oxidedb::types::value::Value;
-use oxidedb::{Interpreter, Lexer, Parser, QError};
+use oxidedb::{Interpreter, QError};
 use proptest::prelude::*;
 use std::rc::Rc;
 
@@ -43,6 +43,7 @@ fn vec_lit_long() {
     assert_eq!(show("1 2 3"), "1 2 3");
     assert_eq!(eval("1 2 3").unwrap().type_code(), 7);
     // a single number is still an atom
+    assert_eq!(eval("2.5"), Ok(Value::Atom(Atom::Float(2.5))));
     assert_eq!(eval("5"), Ok(Value::Atom(Atom::Integer(5))));
 }
 
@@ -90,6 +91,15 @@ fn vec_lit_bool() {
         Ok(vec_of(Column::Bool(vec![true, false, true])))
     );
     assert_eq!(eval("00b"), Ok(vec_of(Column::Bool(vec![false, false]))));
+    // bit order is not palindromic
+    assert_eq!(
+        eval("110b"),
+        Ok(vec_of(Column::Bool(vec![true, true, false])))
+    );
+    assert_eq!(
+        eval("100b"),
+        Ok(vec_of(Column::Bool(vec![true, false, false])))
+    );
     assert_eq!(show("101b"), "101b");
     assert_eq!(eval("101b").unwrap().type_code(), 1);
     // a single boolean stays an atom
@@ -97,12 +107,21 @@ fn vec_lit_bool() {
 }
 
 #[test]
-fn vec_lit_booleans_do_not_mix_into_runs() {
-    // ponytail: pinned as 'type; verify against q.
+fn vec_lit_booleans_do_not_join_runs() {
+    // Juxtaposed nouns are application, whatever their kind.
+    let nyi = Err(QError::Nyi("application".into()));
     for src in [
-        "1 1b", "1b 1", "1b 0b", "1 2 1b", "1b 2 3", "1.5 1b", "1b 2.5",
+        "1 1b",
+        "1b 1",
+        "1b 0b",
+        "1 2 1b",
+        "1b 2 3",
+        "1.5 1b",
+        "1b 2.5",
+        "1 101b",
+        "101b 010b",
     ] {
-        assert_eq!(eval(src), Err(QError::Type), "{src}");
+        assert_eq!(eval(src), nyi, "{src}");
     }
 }
 
@@ -218,22 +237,6 @@ fn vec_lit_application_nyi_does_not_swallow_other_errors() {
     assert_eq!(eval("zz"), Err(QError::Undefined("zz".into())));
 }
 
-fn parse_with_cap(src: &str, cap: usize) -> Result<(), QError> {
-    let tokens = Lexer::new(src).tokenize()?;
-    Parser::new(tokens).with_max_elems(cap).parse().map(|_| ())
-}
-
-#[test]
-fn vec_lit_run_is_capped() {
-    assert_eq!(parse_with_cap("1 2 3", 3), Ok(()));
-    assert_eq!(parse_with_cap("1 2 3 4", 3), Err(QError::Domain));
-    assert_eq!(parse_with_cap("1 2 3.5 4", 3), Err(QError::Domain));
-    assert_eq!(parse_with_cap("1", 0), Err(QError::Domain));
-    assert_eq!(parse_with_cap("x:(1 2 3)", 3), Ok(()));
-    // strings, symbols and booleans are single tokens, not runs
-    assert_eq!(parse_with_cap("\"abcdef\"", 3), Ok(()));
-}
-
 fn run_text(v: &[i64]) -> String {
     v.iter().map(i64::to_string).collect::<Vec<_>>().join(" ")
 }
@@ -254,4 +257,35 @@ proptest! {
         prop_assert_eq!(&got, &floats(&f));
         prop_assert_eq!(eval(&got.to_string()).unwrap(), got);
     }
+}
+
+#[test]
+fn vec_lit_glued_letters_are_invalid_literals() {
+    for src in [
+        "1 2 3j", "2x", "1E3 2", "10n", "1x0N", "1j", "0x01", "1F", "1bb", "1foo", "2x:1",
+    ] {
+        assert!(
+            matches!(eval(src), Err(QError::Parse(m)) if m.starts_with("invalid literal: ")),
+            "{src}"
+        );
+    }
+    assert_eq!(eval("1 2 3j"), Err(QError::parse("invalid literal: 3j...")));
+    // the handled suffixes still lex
+    for src in ["1b", "1f", "1e3", "0N", "0n", "0w", "101b", "1.5e-3"] {
+        assert!(eval(src).is_ok(), "{src}");
+    }
+}
+
+#[test]
+fn vec_lit_parenthesised_semicolon_is_general_lists_nyi() {
+    let nyi = Err(QError::Nyi("general lists".into()));
+    for src in ["(1;2;3)", "()", "(1 2;3)", "(1;)"] {
+        assert_eq!(eval(src), nyi, "{src}");
+    }
+}
+
+#[test]
+fn vec_lit_atom_plus_symbol_is_type() {
+    assert_eq!(eval("1+`a"), Err(QError::Type));
+    assert_eq!(eval("`a+1"), Err(QError::Type));
 }

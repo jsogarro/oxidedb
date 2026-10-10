@@ -385,7 +385,19 @@ impl Lexer {
         rest.get(digits) == Some(&'b') && !rest.get(digits + 1).is_some_and(|c| is_ident_char(*c))
     }
 
+    /// A number must not run straight into a letter or `_` (`2x`, `1E3`, `1j`):
+    /// like a glued literal, that is an invalid literal rather than two tokens.
     fn read_number(&mut self) -> QResult<Token> {
+        let start = self.position;
+        let token = self.read_number_body()?;
+        if self.current_char.is_some_and(is_ident_char) {
+            let text: String = self.input[start..=self.position].iter().collect();
+            return Err(QError::parse(format!("invalid literal: {text}...")));
+        }
+        Ok(token)
+    }
+
+    fn read_number_body(&mut self) -> QResult<Token> {
         let mut number = String::new();
         let mut is_float = false;
 

@@ -39,8 +39,8 @@ fn errors_parse_kind() {
         err("1e999"),
         QError::Parse("float out of range: 1e999".into())
     );
-    // a name glued to a number is application, not yet implemented
-    assert_eq!(err("1x0N"), QError::Nyi("application".into()));
+    // a number glued to a letter is an invalid literal
+    assert_eq!(err("1x0N"), QError::Parse("invalid literal: 1x...".into()));
     // parser failures
     for src in ["1 +", "(1", "+1", ")", "1 2 )", "1 )"] {
         assert!(matches!(err(src), QError::Parse(_)), "{src}");
@@ -140,7 +140,7 @@ fn errors_token_source_form() {
     }
     // as they appear in messages
     let msgs = [
-        ("1 1b", "'type"),
+        ("1 1b", "'nyi: application"),
         ("1 x", "'nyi: application"),
         ("1 \"a\"", "'nyi: application"),
         ("1 )", "'parse: unexpected ) after expression"),

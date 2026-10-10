@@ -45,7 +45,11 @@ oxidedb> _a:1
 'parse: invalid identifier: a name must start with a letter, not '_'
 ```
 
-A name that starts with a digit is an error: `1x:2` is read as the number `1` followed by a stray name.
+A name that starts with a digit is an error: a number glued to a letter is an invalid literal.
+```
+oxidedb> 2x:1
+'parse: invalid literal: 2x...
+```
 
 ## Using Variables in Expressions
 
@@ -150,7 +154,7 @@ oxidedb> name
 
 ## Working with Different Types
 
-Variables can store any atom (integer, float, boolean, character or symbol) and, as the last section showed, lists too. The type belongs to the value, so the same name can hold a different type later.
+Variables can store any atom (integer, float, boolean, character or symbol; Chapter 3 explains symbols) and, as the last section showed, lists too. The type belongs to the value, so the same name can hold a different type later.
 
 ```
 oxidedb> number:42
@@ -164,6 +168,8 @@ oxidedb> letter:"X"
 oxidedb> tag:`red
 `red
 ```
+
+Here `` `red `` is a symbol, a name written with a leading backtick; Chapter 3 explains symbols.
 
 O handles type conversions automatically in mixed expressions:
 ```

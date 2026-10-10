@@ -89,10 +89,8 @@ fn float_suffix() {
 
 #[test]
 fn float_suffix_needs_boundary() {
-    let toks = Lexer::new("1foo").tokenize().unwrap();
-    assert_eq!(toks[0].to_string(), "1");
-    assert_eq!(toks[1].to_string(), "foo");
-    // `1foo` is not a float literal: the number ends and `foo` is a name.
+    // `1foo` is not a float literal followed by a name: a number glued to a letter is invalid.
+    assert!(Lexer::new("1foo").tokenize().is_err());
     assert!(eval("1foo").is_err());
     assert!(eval("x:1;1fx").is_err());
 }

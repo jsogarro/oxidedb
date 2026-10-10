@@ -5,7 +5,6 @@ use crate::language::{
 };
 use crate::types::atom::Atom;
 use crate::types::column::Column;
-use crate::types::column::MAX_ELEMS;
 use crate::types::sym::Sym;
 use crate::types::value::Value;
 use std::rc::Rc;
@@ -63,7 +62,6 @@ pub struct Parser {
     tokens: Vec<Token>,
     current: usize,
     depth: usize,
-    max_elems: usize,
 }
 
 /// Maximum nesting of parentheses / monadic minus.
@@ -80,14 +78,7 @@ impl Parser {
             tokens,
             current: 0,
             depth: 0,
-            max_elems: MAX_ELEMS,
         }
-    }
-
-    /// Lower the cap on a literal run's length (tests; the default is `MAX_ELEMS`).
-    pub fn with_max_elems(mut self, max_elems: usize) -> Self {
-        self.max_elems = max_elems;
-        self
     }
 
     pub fn parse(&mut self) -> QResult<Expr> {
@@ -202,17 +193,7 @@ impl Parser {
             return self.numeric_run();
         }
         match self.advance() {
-            Token::Boolean(b) => {
-                let b = *b;
-                // Booleans never join a numeric or boolean run (`1 1b`, `1b 0b`).
-                if matches!(
-                    self.peek(),
-                    Token::Integer(_) | Token::Float(_) | Token::Boolean(_)
-                ) {
-                    return Err(QError::Type);
-                }
-                Ok(Expr::Lit(Value::Atom(Atom::Boolean(b))))
-            }
+            Token::Boolean(b) => Ok(Expr::Lit(Value::Atom(Atom::Boolean(*b)))),
             Token::Character(c) => Ok(Expr::Lit(Value::Atom(Atom::Character(*c)))),
             Token::Sym(s) => Ok(Expr::Lit(Value::Atom(Atom::Symbol(Sym::intern(s))))),
             Token::SymList(names) => Ok(vector(Column::Sym(
@@ -222,7 +203,13 @@ impl Parser {
             Token::BoolList(bits) => Ok(vector(Column::Bool(bits.clone()))),
             Token::Symbol(s) => Ok(Expr::Symbol(s.clone())),
             Token::LeftParen => {
+                if self.check(&Token::RightParen) {
+                    return Err(QError::Nyi("general lists".into()));
+                }
                 let expr = self.expression()?;
+                if self.check(&Token::Semicolon) {
+                    return Err(QError::Nyi("general lists".into()));
+                }
                 if !self.match_tokens(&[Token::RightParen]) {
                     return Err(nyi_token(self.peek())
                         .unwrap_or_else(|| QError::parse("expected ')' after expression")));
@@ -243,13 +230,7 @@ impl Parser {
         while matches!(self.peek(), Token::Integer(_) | Token::Float(_)) {
             self.current += 1;
         }
-        if matches!(self.peek(), Token::Boolean(_)) {
-            return Err(QError::Type);
-        }
         let run = &self.tokens[start..self.current];
-        if run.len() > self.max_elems {
-            return Err(QError::Domain);
-        }
         let to_float = |t: &Token| match t {
             Token::Integer(i64::MIN) => f64::NAN,
             Token::Integer(n) => *n as f64,

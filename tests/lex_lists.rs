@@ -105,10 +105,7 @@ fn lex_lists_bool_vector() {
         ]
     );
     // a trailing identifier character means the literal is malformed
-    assert_eq!(
-        lex("1bb"),
-        vec![Token::Integer(1), Token::Symbol("bb".into())]
-    );
+    assert_eq!(lex_err("1bb"), parse("invalid literal: 1b..."));
     for src in ["102b", "10b1", "10bx", "12b", "10b_"] {
         match lex_err(src) {
             QError::Parse(d) => assert!(d.starts_with("invalid literal"), "{src}: {d}"),
@@ -285,10 +282,7 @@ fn lex_lists_minus_never_folds_into_a_boolean() {
         vec![Token::Integer(2), Token::Minus, Token::Boolean(true)]
     );
     // still a number when no boolean follows
-    assert_eq!(
-        lex("-1bc"),
-        vec![Token::Integer(-1), Token::Symbol("bc".into())]
-    );
+    assert_eq!(lex_err("-1bc"), parse("invalid literal: -1b..."));
     assert_eq!(lex("-12"), vec![Token::Integer(-12)]);
 }
 

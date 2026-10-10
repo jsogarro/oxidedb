@@ -12,7 +12,7 @@ OxideDB aims to provide the power and expressiveness of Q/KDB+ with Rust's memor
 - **Interactive REPL**: Full-featured Read-Eval-Print Loop with command history
 - **File Execution**: Run O scripts directly from files (.o extension)
 - **Variable System**: Named values held in memory for the length of a session (nothing is saved to disk; REPL input history is kept in `~/.oxidedb_history`)
-- **Type System**: Integers, floats, booleans and characters, with null and infinity values (`0N`, `0n`, `0w`) (symbol literals are not implemented yet)
+- **Type System**: Integers, floats, booleans, characters and symbols, with null and infinity values (`0N`, `0n`, `0w`), symbols and vectors
 - **Comprehensive Documentation**: "O for Humans" book with executable examples
 - **Memory Safety**: Written in safe Rust
 
@@ -45,6 +45,7 @@ Execute O script files directly:
 # Run example files
 cargo run -- book/examples/01-atoms-and-arithmetic.o
 cargo run -- book/examples/02-variables-and-assignment.o
+cargo run -- book/examples/03-vectors-and-lists.o
 
 # Run any .o file
 cargo run -- path/to/your/script.o
@@ -157,6 +158,7 @@ Complete guide to the O programming language located in `/book/`:
 - **Introduction**: Overview of O and OxideDB
 - **Chapter 1**: Atoms and Basic Arithmetic
 - **Chapter 2**: Variables and Assignment
+- **Chapter 3**: Vectors and Lists (in progress: vector literals)
 
 ### Executable Examples
 Run interactive examples from the book:

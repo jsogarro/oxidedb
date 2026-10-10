@@ -321,7 +321,7 @@ oxidedb> 6/2
 
 - `'type`: the operands do not fit the operation
 - `'overflow`: an integer result left the 64-bit range
-- `'parse: ...`: the text is not valid O; the detail says what the parser or lexer saw, with tokens shown the way O prints them (`1 )` reports `)`)
+- `'parse: ...`: the text is not valid O; the detail says what the parser or lexer saw
 - `'x (Undefined variable)`: the name `x` has not been assigned
 - `'nyi: ...`: not yet implemented; the detail names the missing feature, such as an adverb
 

@@ -4,11 +4,11 @@ So far every value has been a single atom. Real data comes in bunches: a week of
 
 ## Why Vectors?
 
-A **vector** is a list whose items all have the same type. O stores it compactly and, once vector arithmetic arrives, will apply an operation to every item in one step instead of making you write a loop. A list of numbers is written by putting the numbers next to each other, separated by spaces.
+In this book a **list** is the general word for an ordered collection of values, and a **vector** is a list whose items all have the same type. Every literal in this chapter is a vector. O stores it compactly and, once vector arithmetic arrives, will apply an operation to every item in one step instead of making you write a loop. A list of numbers is written by putting the numbers next to each other, separated by spaces.
 
 ## Vector Literals
 
-### Long (integer) vectors
+### Long vectors
 ```
 oxidedb> 1 2 3
 1 2 3
@@ -36,14 +36,12 @@ oxidedb> 101b
 oxidedb> 00b
 00b
 ```
-A single `1b` or `0b` is still a boolean atom. Booleans do not mix with numbers in a list: `1 1b` is a `'type` error, and so is `1b 0b` (use `10b`).
+A single `1b` or `0b` is still a boolean atom. Booleans in a list are written glued together as one token: `101b`, not `1b 0b 1b`. Separate booleans (or a boolean and a number) side by side are not a list; see Unfinished Business below.
 ```
 oxidedb> 1b
 1b
-oxidedb> 1 1b
-'type
 oxidedb> 1b 0b
-'type
+'nyi: application
 ```
 
 ### Symbols
@@ -56,7 +54,7 @@ oxidedb> `
 oxidedb> `a`b`c
 `a`b`c
 ```
-Symbol names use letters, digits, `_` and `.`. Write the symbols of a vector with no spaces between them.
+Symbol names use letters, digits, `_` and `.`. Write the symbols of a vector with no spaces between the backticks: two symbols with a space between them, `` `a `b ``, are two values side by side, which O reads as application (see Unfinished Business below), not as a vector.
 
 ### Strings are lists of characters
 A string is a list of characters, so `"abc"` is a character vector. In Chapter 1 we saw that one character in quotes is an atom; two or more make a vector, and empty quotes make the empty character vector:
@@ -88,7 +86,7 @@ The same-looking value can be an atom or a list. `5` is an atom; there is no way
 
 ## The Negative-Literal Trap
 
-A minus sign glued to a digit is part of the number when it follows a space, so after a number `2 -1` is **a list of two numbers**, not subtraction. Subtraction needs spaces on both sides or on neither:
+A minus sign glued to a digit is part of the number in three places: at the start of a line (`-1 2 3`), after an operator or an opening bracket (`2*-1`), and after a space that follows a number (`2 -1`). So after a number `2 -1` is **a list of two numbers**, not subtraction. Subtraction needs spaces on both sides or on neither:
 ```
 oxidedb> 2 -1
 2 -1
@@ -100,6 +98,19 @@ oxidedb> 1 -2 3
 1 -2 3
 oxidedb> -1 2 3
 -1 2 3
+oxidedb> 2*-1
+-2
+```
+The most common trap is a variable. With `x:5`, `x -1` is **not** subtraction: a name is a value too, so it is two values side by side, and O reports `'nyi: application` (q would index `x` with `-1`). `x - 1` and `x-1` subtract:
+```
+oxidedb> x:5
+5
+oxidedb> x -1
+'nyi: application
+oxidedb> x - 1
+4
+oxidedb> x-1
+4
 ```
 When in doubt, put spaces around the minus you mean as an operator.
 
@@ -141,7 +152,7 @@ oxidedb> 1 0n
 oxidedb> 1 0w
 1 0w
 ```
-When the list is promoted to floats, an integer null becomes the float null `0n`, because only floats can hold a float null:
+When the list is promoted to floats, a float vector cannot hold an integer null, so `0N` becomes `0n`:
 ```
 oxidedb> 0N 0n
 0n 0n
@@ -151,12 +162,23 @@ oxidedb> 0N 1.5
 
 ## Unfinished Business
 
-Two things that look like lists are not supported yet, and both give a clear error rather than a wrong answer. Putting values of different kinds side by side, such as `1 "a"`, would be a function applied to an argument in q, and O has no functions yet:
+Four things that look like they should work are not supported yet. Each gives a clear error rather than a wrong answer.
+
+Two values side by side that do not form a literal vector are, in q, the left one applied to the right one: indexing a list or calling a function. That means any two nouns, of the same kind or not: `1 "a"`, `` `a `b ``, `"ab" "cd"`, `(1 2) 3`, `x 1 2` and `1b 0b`. It arrives with indexing:
 ```
 oxidedb> 1 "a"
 'nyi: application
+oxidedb> `a `b
+'nyi: application
+oxidedb> (1 2) 3
+'nyi: application
 oxidedb> x 1 2
 'nyi: application
+```
+General lists, written with parentheses and semicolons, are not built yet:
+```
+oxidedb> (1;2;3)
+'nyi: general lists
 ```
 Arithmetic on a vector is not built yet either; for now a vector can be stored and displayed but not computed with:
 ```
@@ -193,10 +215,11 @@ These parts of the chapter will be added as the features arrive. None of them wo
 ## Key Takeaways
 
 - Numbers next to each other form a vector; one float makes the whole vector float
-- `101b` is a boolean vector; booleans do not mix with numbers
+- `101b` is a boolean vector, written glued
 - `` `a `` is a symbol atom and `` `a`b `` a symbol vector
 - A string is a character vector; one character in quotes is an atom
 - `2 -1` is a two-item vector; write `2 - 1` for subtraction
+- Two values side by side that are not one literal are application, which is not built yet (`x -1` is the classic surprise)
 - Variables hold vectors, and reading one does not copy it
 - A null inside a float vector is `0n`
 - Vector arithmetic, indexing and the rest are still to come
