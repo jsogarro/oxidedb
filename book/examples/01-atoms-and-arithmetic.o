@@ -81,6 +81,9 @@
 // Expected output: 1.5
 1b + 0.5
 
+// Expected output: -1
+-1b
+
 // Character Values
 // Expected output: "a"
 "a"

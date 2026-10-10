@@ -1,7 +1,7 @@
 //! `+ - * %` over atoms, vectors and general lists, atomic as in q.
 //! Bool promotes to long; long with float is float; `%` is always float.
 
-use super::{atomic, Flat};
+use super::{atomic, long_to_float, Flat};
 use crate::error::{QError, QResult};
 use crate::language::ast::Verb;
 use crate::types::atom::Atom;
@@ -15,15 +15,6 @@ fn checked(result: Option<i64>) -> QResult<i64> {
     match result {
         Some(n) if n != i64::MIN => Ok(n),
         _ => Err(QError::Overflow),
-    }
-}
-
-/// Long null is the i64::MIN sentinel; as a float it is NaN.
-fn long_to_float(n: i64) -> f64 {
-    if n == i64::MIN {
-        f64::NAN
-    } else {
-        n as f64
     }
 }
 
@@ -109,23 +100,23 @@ fn zip_with<T: Copy, U>(
     mut f: impl FnMut(T, T) -> QResult<U>,
 ) -> QResult<Vec<U>> {
     let n = match (a_scalar, b_scalar) {
-        // two scalars are one element: either length will do
+        // a scalar side takes the other side's length
         (true, _) => b.len(),
         (false, true) => a.len(),
         (false, false) if a.len() == b.len() => a.len(),
         (false, false) => return Err(QError::Length),
     };
-    (0..n)
-        .map(|i| {
-            f(
-                a[if a_scalar { 0 } else { i }],
-                b[if b_scalar { 0 } else { i }],
-            )
-        })
-        .collect()
+    let mut out = Vec::with_capacity(n);
+    for i in 0..n {
+        out.push(f(
+            a[if a_scalar { 0 } else { i }],
+            b[if b_scalar { 0 } else { i }],
+        )?);
+    }
+    Ok(out)
 }
 
-/// The shared kernel: a result column, or a one-element column for two scalars.
+/// The vector kernel: at least one operand is a column; a scalar side broadcasts.
 fn column_op(verb: Verb, a: &Num, a_scalar: bool, b: &Num, b_scalar: bool) -> QResult<Column> {
     let k = kernel(verb)?;
     if let (Num::Long(x), Num::Long(y), Some(op)) = (a, b, k.long) {
@@ -191,28 +182,26 @@ fn column_value(c: Column) -> Value {
 }
 
 pub fn neg(v: &Value) -> QResult<Value> {
-    match v {
-        Value::Atom(Atom::Integer(n)) => long_neg(*n).map(|n| Value::Atom(Atom::Integer(n))),
-        Value::Atom(Atom::Float(x)) => Ok(Value::Atom(Atom::Float(-x))),
-        Value::Vector(c) => match &**c {
-            Column::Long(xs) => xs
-                .iter()
-                .map(|&n| long_neg(n))
-                .collect::<QResult<_>>()
-                .map(|v| column_value(Column::Long(v))),
-            Column::Float(xs) => Ok(column_value(Column::Float(xs.iter().map(|x| -x).collect()))),
-            _ => Err(QError::Type),
-        },
-        Value::List(l) => l
-            .iter()
-            .map(neg)
-            .collect::<QResult<_>>()
-            .map(Value::from_items),
-        Value::Atom(_) => Err(QError::Type),
-    }
+    Ok(match v {
+        Value::Atom(Atom::Boolean(x)) => Value::Atom(Atom::Integer(-i64::from(*x))),
+        Value::Atom(Atom::Integer(n)) => Value::Atom(Atom::Integer(long_neg(*n))),
+        Value::Atom(Atom::Float(x)) => Value::Atom(Atom::Float(-x)),
+        Value::Vector(c) => column_value(match &**c {
+            Column::Bool(xs) => Column::Long(xs.iter().map(|&x| -i64::from(x)).collect()),
+            Column::Long(xs) => Column::Long(xs.iter().map(|&n| long_neg(n)).collect()),
+            Column::Float(xs) => Column::Float(xs.iter().map(|x| -x).collect()),
+            Column::Char(_) | Column::Sym(_) => return Err(QError::Type),
+        }),
+        Value::List(l) => Value::from_items(l.iter().map(neg).collect::<QResult<_>>()?),
+        Value::Atom(_) => return Err(QError::Type),
+    })
 }
 
-fn long_neg(n: i64) -> QResult<i64> {
-    // Only the null negates to MIN, and it stays null; no other value overflows.
-    Ok(if n == i64::MIN { n } else { -n })
+/// Only the null negates to MIN, and it stays null; no other value overflows.
+fn long_neg(n: i64) -> i64 {
+    if n == i64::MIN {
+        n
+    } else {
+        -n
+    }
 }

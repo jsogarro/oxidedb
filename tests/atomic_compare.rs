@@ -413,6 +413,44 @@ fn cmp_general_list_recurses() {
 }
 
 #[test]
+fn cmp_list_results_collapse_to_bool_vectors() {
+    let mixed = || list(vec![l(1), s("a")]);
+    assert_eq!(eq(&mixed(), &mixed()), Ok(bv(&[true, true])));
+    assert_eq!(ne(&mixed(), &mixed()), Ok(bv(&[false, false])));
+    assert_eq!(
+        lt(&list(vec![l(1), l(2)]), &lv(&[2, 2])),
+        Ok(bv(&[true, false]))
+    );
+    assert_eq!(
+        lt(&lv(&[1, 2]), &list(vec![l(2), l(2)])),
+        Ok(bv(&[true, false]))
+    );
+    assert_eq!(gt(&list(vec![l(1), l(2)]), &l(1)), Ok(bv(&[false, true])));
+    assert_eq!(gt(&l(2), &list(vec![l(1), l(2)])), Ok(bv(&[true, false])));
+}
+
+// Decisions where O differs from q or follows its conversion rule.
+#[test]
+fn cmp_precision_decisions() {
+    // a long against a float converts to float first, as q does
+    assert_eq!(
+        eq(&l(9007199254740993), &f(9007199254740992.0)),
+        Ok(b(true))
+    );
+    assert_eq!(
+        eq(&f(9007199254740992.0), &l(9007199254740993)),
+        Ok(b(true))
+    );
+    // long against long stays exact
+    assert_eq!(eq(&l(9007199254740993), &l(9007199254740992)), Ok(b(false)));
+    // float equality is exact in O (q is tolerant)
+    assert_eq!(eq(&f(0.1 + 0.2), &f(0.3)), Ok(b(false)));
+    assert_eq!(gt(&f(0.1 + 0.2), &f(0.3)), Ok(b(true)));
+    // a character is not a number in O (q compares by code)
+    assert_eq!(eq(&c('a'), &l(97)), Err(QError::Type));
+}
+
+#[test]
 fn cmp_empty_vectors() {
     for verb in CMP {
         assert_eq!(dyad(verb, &lv(&[]), &l(1)), Ok(bv(&[])));

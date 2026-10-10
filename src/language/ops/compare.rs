@@ -3,7 +3,7 @@
 //! Numbers (bool, long, float) compare by value; null equals null and sorts
 //! lowest; symbols and characters compare among themselves.
 
-use super::{atomic, Flat};
+use super::{atomic, long_to_float, Flat};
 use crate::error::{QError, QResult};
 use crate::language::ast::Verb;
 use crate::types::atom::Atom;
@@ -72,26 +72,19 @@ fn float_order(a: f64, b: f64) -> Ordering {
         .unwrap_or_else(|| b.is_nan().cmp(&a.is_nan()))
 }
 
-/// A long null is the NaN null once a float is involved.
-fn as_float(n: i64) -> f64 {
-    if n == i64::MIN {
-        f64::NAN
-    } else {
-        n as f64
-    }
-}
-
 /// Order two elements of the same kind (the caller has checked the kinds).
 fn order(a: Item, b: Item) -> Ordering {
     match (a, b) {
         (Item::Long(x), Item::Long(y)) => x.cmp(&y),
         (Item::Float(x), Item::Float(y)) => float_order(x, y),
-        (Item::Long(x), Item::Float(y)) => float_order(as_float(x), y),
-        (Item::Float(x), Item::Long(y)) => float_order(x, as_float(y)),
+        (Item::Long(x), Item::Float(y)) => float_order(long_to_float(x), y),
+        (Item::Float(x), Item::Long(y)) => float_order(x, long_to_float(y)),
         (Item::Char(x), Item::Char(y)) => x.cmp(&y),
         // Symbols order by name; the null symbol is the empty name.
+        // Equal symbols share an id, so no interner lookup is needed for `=` and `<>`.
+        (Item::Sym(x), Item::Sym(y)) if x == y => Ordering::Equal,
         (Item::Sym(x), Item::Sym(y)) => x.as_str().cmp(y.as_str()),
-        _ => Ordering::Equal,
+        _ => unreachable!("operand kinds are checked before elements are ordered"),
     }
 }
 
@@ -102,7 +95,8 @@ fn holds(verb: Verb, o: Ordering) -> bool {
         Verb::Less => o == Ordering::Less,
         Verb::LessEqual => o != Ordering::Greater,
         Verb::Greater => o == Ordering::Greater,
-        _ => o != Ordering::Less,
+        Verb::GreaterEqual => o != Ordering::Less,
+        _ => unreachable!("not a comparison verb"),
     }
 }
 
