@@ -17,7 +17,11 @@ fn operand() -> impl Strategy<Value = String> {
 }
 
 fn chain(atom: impl Strategy<Value = String>) -> impl Strategy<Value = String> {
-    let op = prop::sample::select(&["+", "-", "*", "%"][..]);
+    let op = prop::sample::select(
+        &[
+            "+", "-", "*", "%", "=", "<", ">", "<>", "<=", ">=", "#", ",", "!",
+        ][..],
+    );
     (
         atom,
         proptest::collection::vec((op, any::<bool>(), operand()), 0..=3),
@@ -73,7 +77,9 @@ const NUMS: &[&str] = &[
     // Monadic minus on the reserved null (the long null `0N`): must never panic.
     "-(-9223372036854775808)",
 ];
-const OPS: &[&str] = &["+", "-", "*", "%"];
+const OPS: &[&str] = &[
+    "+", "-", "*", "%", "=", "<", ">", "<>", "<=", ">=", "#", ",", "!",
+];
 
 /// Lexer -> Parser -> Interpreter -> Display, ignoring every `Err`; only a panic fails.
 fn pipeline(src: &str) {
