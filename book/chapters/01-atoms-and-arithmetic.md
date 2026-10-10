@@ -25,7 +25,7 @@ oxidedb> 3.14159
 oxidedb> -2.5
 -2.5
 oxidedb> 0.0
-0
+0f
 ```
 
 ### Booleans
@@ -59,7 +59,7 @@ oxidedb> 2 + 3
 oxidedb> 10 + 7
 17
 oxidedb> 2.5 + 1.5
-4
+4f
 ```
 
 ### Subtraction (-)
@@ -79,7 +79,7 @@ oxidedb> 4 * 5
 oxidedb> 3 * 7
 21
 oxidedb> 2.5 * 4
-10
+10f
 ```
 
 ### Division (%)
@@ -145,7 +145,7 @@ O automatically handles mixed-type arithmetic by promoting integers to floats wh
 oxidedb> 5 + 2.5
 7.5
 oxidedb> 3.0 * 4
-12
+12f
 oxidedb> 10 % 3.0
 3.3333333333333335
 ```

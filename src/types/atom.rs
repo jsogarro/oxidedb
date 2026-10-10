@@ -93,12 +93,42 @@ impl Atom {
     }
 }
 
+/// q-style float display, equivalent to C `%.7g` (q's default `\P 7`): exponent
+/// form when the decimal exponent is < -4 or >= 7 (`1e-05`, `1.234568e+07`),
+/// otherwise fixed. Trailing zeros are trimmed; an integral fixed result gets
+/// the `f` suffix (`845f`).
+fn write_float(f: &mut fmt::Formatter, fl: f64) -> fmt::Result {
+    let sci = format!("{:.6e}", fl);
+    let (mantissa, exp) = sci.split_once('e').unwrap_or((&sci, "0"));
+    let exp: i32 = exp.parse().unwrap_or(0);
+    if !(-4..7).contains(&exp) {
+        let mantissa = mantissa.trim_end_matches('0').trim_end_matches('.');
+        return write!(
+            f,
+            "{}e{}{:02}",
+            mantissa,
+            if exp < 0 { '-' } else { '+' },
+            exp.abs()
+        );
+    }
+    let r: f64 = sci.parse().unwrap_or(fl);
+    if r.fract() == 0.0 {
+        write!(f, "{}f", r)
+    } else {
+        write!(f, "{}", r)
+    }
+}
+
 impl fmt::Display for Atom {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Atom::Boolean(b) => write!(f, "{}", if *b { "1b" } else { "0b" }),
             Atom::Integer(i) => write!(f, "{}", i),
-            Atom::Float(fl) => write!(f, "{}", fl),
+            Atom::Float(fl) if fl.is_nan() => write!(f, "0n"),
+            Atom::Float(fl) if fl.is_infinite() => {
+                write!(f, "{}0w", if *fl < 0.0 { "-" } else { "" })
+            }
+            Atom::Float(fl) => write_float(f, *fl),
             Atom::Character(c) => write!(f, "\"{}\"", c),
             Atom::Date(d) => write!(f, "{}", d.format("%Y.%m.%d")),
             Atom::Time(t) => write!(f, "{}", t.format("%H:%M:%S.%3f")),

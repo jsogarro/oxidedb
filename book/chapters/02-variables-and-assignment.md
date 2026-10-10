@@ -135,11 +135,11 @@ O handles type conversions automatically in mixed expressions:
 oxidedb> int_val:5
 5
 oxidedb> float_val:2.0
-2
+2f
 oxidedb> result:int_val*float_val
-10
+10f
 oxidedb> result
-10
+10f
 ```
 
 ## Error Handling
