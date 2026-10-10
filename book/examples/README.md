@@ -19,6 +19,7 @@ cargo run -- book/examples/filename.o
 
 Each .o file contains:
 - Comments explaining the concepts (`/` at the start of a line or after whitespace comments out the rest of the line, so `//` works too and trailing comments are allowed; a `/` glued to the previous token is the over adverb)
+- Block comments (file mode only, markers in column 0): a line with only `/` starts one, a line with only `\` ends it; blocks nest and an unclosed block runs to the end of the file. A line with only `\\` (or a `\` outside a block) ends the script successfully. `cargo test --test scripts` checks these by running the binary; the example checker `book_examples` reads one line at a time, so example files do not use them
 - O expressions to execute
 - Expected output documented in comments above each expression
 

@@ -3,7 +3,12 @@ use crate::language::interpreter::Interpreter;
 use anyhow::{Context, Result};
 use rustyline::{error::ReadlineError, DefaultEditor};
 use std::io::IsTerminal;
-use std::{fs, path::PathBuf};
+use std::{ffi::OsString, fs, path::PathBuf};
+
+/// The `\\` command ends a session (interactive or script).
+fn is_exit_line(line: &str) -> bool {
+    line == "\\\\"
+}
 
 pub struct Repl {
     editor: DefaultEditor,
@@ -29,7 +34,16 @@ impl Repl {
         if !std::io::stdin().is_terminal() {
             return None;
         }
-        std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".oxidedb_history"))
+        Self::history_path_from(std::env::var_os("HOME"), std::env::var_os("USERPROFILE"))
+    }
+
+    /// `$HOME`, else `%USERPROFILE%` (Windows), plus `.oxidedb_history`.
+    pub fn history_path_from(
+        home: Option<OsString>,
+        userprofile: Option<OsString>,
+    ) -> Option<PathBuf> {
+        home.or(userprofile)
+            .map(|h| PathBuf::from(h).join(".oxidedb_history"))
     }
 
     pub fn run(&mut self) -> Result<()> {
@@ -45,7 +59,7 @@ impl Repl {
                         continue;
                     }
 
-                    if line == "exit" || line == "quit" || line == "\\\\" {
+                    if line == "exit" || line == "quit" || is_exit_line(line) {
                         println!("Goodbye!");
                         break;
                     }
@@ -73,7 +87,11 @@ impl Repl {
         Ok(())
     }
 
-    /// Runs a file; the first failing line aborts with an error that wraps the
+    /// Runs a file, with q's script rules (columns matter: markers must start in column 0):
+    /// a line of only `\\` or only `\` outside a block ends the script successfully; a line of
+    /// only `/` opens a block comment and a line of only `\` closes it (blocks nest; one left
+    /// open runs to the end of the file); block bodies are skipped unlexed. Trailing whitespace on
+    /// a marker is ignored. The first failing line aborts with an error that wraps the
     /// `QError` in a `line N` context (printed as `line 3: 'type`, and
     /// recoverable with `downcast_ref::<QError>()`). The caller reports it once.
     pub fn run_file(&mut self, filename: &str) -> Result<()> {
@@ -81,8 +99,24 @@ impl Repl {
             fs::read_to_string(filename).with_context(|| format!("cannot read {filename}"))?;
         let content = content.strip_prefix('\u{feff}').unwrap_or(&content);
 
-        for (line_num, line) in content.lines().enumerate() {
-            let line = line.trim();
+        let mut block_depth = 0usize;
+        for (line_num, raw) in content.lines().enumerate() {
+            let marker = raw.trim_end_matches([' ', '\t', '\r']);
+            match marker {
+                "/" => {
+                    block_depth += 1;
+                    continue;
+                }
+                "\\" if block_depth > 0 => {
+                    block_depth -= 1;
+                    continue;
+                }
+                _ if block_depth > 0 => continue,
+                "\\" => break,
+                _ if is_exit_line(marker) => break,
+                _ => {}
+            }
+            let line = raw.trim();
             if line.is_empty() {
                 continue;
             }
