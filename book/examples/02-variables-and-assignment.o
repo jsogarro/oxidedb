@@ -159,3 +159,7 @@ neg_x:2
 
 // Expected output: -5
 -neg_x+3
+
+// Names start with a letter; digits and underscores may follow
+// Expected output: 7
+x1_a:7

@@ -8,7 +8,8 @@ fn operand() -> impl Strategy<Value = String> {
     prop_oneof![
         6 => prop::sample::select(&[
             "0", "00", "0.", "1", "1.5", "42", "9223372036854775807", "9223372036854775808",
-            "-9223372036854775808", "1b", "0b", "-1",
+            "-9223372036854775808", "1b", "0b", "-1", "0N", "0n", "0w", "-0w", "1e3", "1e-3", "1f",
+            "0W", "1e", "1F",
         ][..]).prop_map(String::from),
         2 => prop::sample::select(&["a", "é", "_", "x1", "日本"][..]).prop_map(String::from),
     ]
@@ -64,7 +65,7 @@ const NUMS: &[&str] = &[
     "-(1)",
     "-(1.5)",
     "-(9223372036854775807)",
-    // Monadic minus on the reserved null: must be an error, never an overflow panic.
+    // Monadic minus on the reserved null (the long null `0N`): must never panic.
     "-(-9223372036854775808)",
 ];
 const OPS: &[&str] = &["+", "-", "*", "%"];

@@ -25,8 +25,8 @@ oxidedb> x
 ## Variable Names
 
 Variable names in O follow these rules:
-- Must start with a letter or underscore (O accepts a leading underscore, but q does not, so prefer a letter)
-- Can contain letters, numbers, and underscores
+- Must start with a letter; a leading underscore is an error (in q `_` is a verb)
+- Can contain letters, digits, and underscores (ASCII only, so `é` is an error)
 - Are case-sensitive
 
 Valid variable names:
@@ -37,6 +37,12 @@ oxidedb> total_count:42
 42
 oxidedb> x1:100
 100
+```
+
+A leading underscore is rejected:
+```
+oxidedb> _a:1
+Error: Invalid identifier: a name must start with a letter, not '_'
 ```
 
 A name that starts with a digit is an error: `1x:2` is read as the number `1` followed by a stray name.
@@ -181,7 +187,7 @@ Error: Undefined variable: undefined_variable
 ## Key Takeaways
 
 - Use `:` for assignment: `variable:value`
-- Variable names are case-sensitive and start with a letter (or underscore)
+- Variable names are case-sensitive and start with a letter
 - Assignment returns its value, so `x:y:7` and `(a:1)+2` work
 - Variables can be used in expressions like literal values
 - Right-to-left evaluation applies to expressions with variables

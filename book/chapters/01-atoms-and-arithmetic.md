@@ -43,9 +43,49 @@ oxidedb> 12345678.0
 1.234568e+07
 ```
 
-Not yet: `1f` cannot be typed; write `1.0`.
+Scientific notation uses a lowercase `e` followed by an optional sign and digits, and an `f` suffix marks a whole number as a float. The result is always a float:
+```
+oxidedb> 1e3
+1000f
+oxidedb> 1.5e3
+1500f
+oxidedb> 1e-3
+0.001
+oxidedb> 2f
+2f
+```
+A bare `1e` or `1e+` is an error, and so is a literal too large for a float (`1e999`: "Float out of range").
 
-Not yet: `0w` (infinity) and `0n` (not a number) cannot be typed; they only appear as the result of a division.
+### Nulls and infinities
+`0N` is the long (integer) null, `0n` is the float null (it also shows up as the result of a calculation that is not a number), and `0w` and `-0w` are the float infinities. They display exactly as typed:
+```
+oxidedb> 0N
+0N
+oxidedb> 0n
+0n
+oxidedb> 0w
+0w
+oxidedb> -0w
+-0w
+```
+`0N` is an integer and the other three are floats. A null in arithmetic gives a null: a long null with another long gives `0N`, and a long null mixed with a float (or divided with `%`) gives `0n`:
+```
+oxidedb> 0N + 1
+0N
+oxidedb> 0N + 1.5
+0n
+oxidedb> 0N % 2
+0n
+```
+`0N` is stored as the smallest 64-bit integer, so the literal `-9223372036854775808` reads as `0N`. See the overflow section for what happens when a computation lands on that value. `0W` (the long infinity) is not supported.
+
+Float arithmetic that grows past the largest float gives an infinity, but a float *literal* that is out of range is an error:
+```
+oxidedb> 1e308 * 10
+0w
+oxidedb> 1e999
+Error: Float out of range: 1e999
+```
 
 ### Booleans
 True or false values:
@@ -118,7 +158,7 @@ oxidedb> 7 % 2
 3.5
 ```
 
-Dividing by zero is not an error; it follows IEEE 754, so `1 % 0` is `0w` (infinity) and `0 % 0` is `0n` (not a number).
+Dividing by zero is not an error; it follows IEEE 754, so `1 % 0` is `0w` (infinity) and `0 % 0` is `0n` (the float null, shown for results that are not a number).
 
 The `/` character is **not** division. After a space it starts a comment, so everything from it to the end of the line is ignored; glued to the previous token it is the *over* adverb, which O does not implement yet:
 ```
@@ -144,6 +184,12 @@ oxidedb> -9223372036854775808
 0N
 oxidedb> -9223372036854775807 - 1
 Error: Integer overflow
+```
+
+A null operand is not an overflow: arithmetic on `0N` gives `0N`, so `-9223372036854775808 + 1` is `0N`:
+```
+oxidedb> -9223372036854775808 + 1
+0N
 ```
 
 ## Right-to-Left Evaluation
