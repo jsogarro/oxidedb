@@ -4,14 +4,15 @@ use crate::language::{
     lexer::Token,
 };
 use crate::types::atom::Atom;
+use crate::types::column::Column;
+use crate::types::sym::Sym;
+use crate::types::value::Value;
+use std::rc::Rc;
 
 /// The not-yet-implemented error for a token the parser cannot handle yet
 /// (list literals, adverbs, verbs, punctuation); `None` for any other token.
 fn nyi_token(token: &Token) -> Option<QError> {
     let detail = match token {
-        Token::Str(_) => "strings (a character literal holds exactly one character)".to_string(),
-        Token::Sym(_) | Token::SymList(_) => "symbols".to_string(),
-        Token::BoolList(_) => "boolean lists".to_string(),
         Token::Over | Token::Scan => format!("adverb '{token}'"),
         Token::Quote => "adverb ' (each)".to_string(),
         Token::EachPrior => "adverb ': (each-prior)".to_string(),
@@ -34,6 +35,27 @@ fn nyi_token(token: &Token) -> Option<QError> {
         _ => return None,
     };
     Some(QError::Nyi(detail))
+}
+
+fn vector(column: Column) -> Expr {
+    Expr::Lit(Value::Vector(Rc::new(column)))
+}
+
+/// Tokens that begin a noun (a literal, a name or a parenthesised expression).
+fn starts_noun(token: &Token) -> bool {
+    matches!(
+        token,
+        Token::Integer(_)
+            | Token::Float(_)
+            | Token::Boolean(_)
+            | Token::Character(_)
+            | Token::Symbol(_)
+            | Token::Sym(_)
+            | Token::SymList(_)
+            | Token::Str(_)
+            | Token::BoolList(_)
+            | Token::LeftParen
+    )
 }
 
 pub struct Parser {
@@ -118,6 +140,10 @@ impl Parser {
                     };
                 }
             }
+            // A noun straight after a noun is application (`x 1`, `1 "a"`), not built yet.
+            if starts_noun(self.peek()) {
+                return Err(QError::Nyi("application".into()));
+            }
             operands.push(operand);
             if !self.match_tokens(&[Token::Plus, Token::Minus, Token::Multiply, Token::Divide]) {
                 break;
@@ -148,7 +174,7 @@ impl Parser {
 
     fn unary(&mut self) -> QResult<Expr> {
         if self.match_tokens(&[Token::Minus]) {
-            // Monadic minus takes its whole right side, as in q: -x+3 is -(x+3).
+            // Monadic minus takes its whole right side (O's rule; q uses `neg`): -x+3 is -(x+3).
             let expr = self.expression()?;
             return Ok(Expr::UnaryOp {
                 operator: UnaryOperator::Negate,
@@ -163,14 +189,27 @@ impl Parser {
         if self.is_at_end() {
             return Err(QError::parse("unexpected end of input"));
         }
+        if matches!(self.peek(), Token::Integer(_) | Token::Float(_)) {
+            return self.numeric_run();
+        }
         match self.advance() {
-            Token::Integer(n) => Ok(Expr::Atom(Atom::Integer(*n))),
-            Token::Float(f) => Ok(Expr::Atom(Atom::Float(*f))),
-            Token::Boolean(b) => Ok(Expr::Atom(Atom::Boolean(*b))),
-            Token::Character(c) => Ok(Expr::Atom(Atom::Character(*c))),
+            Token::Boolean(b) => Ok(Expr::Lit(Value::Atom(Atom::Boolean(*b)))),
+            Token::Character(c) => Ok(Expr::Lit(Value::Atom(Atom::Character(*c)))),
+            Token::Sym(s) => Ok(Expr::Lit(Value::Atom(Atom::Symbol(Sym::intern(s))))),
+            Token::SymList(names) => Ok(vector(Column::Sym(
+                names.iter().map(|s| Sym::intern(s)).collect(),
+            ))),
+            Token::Str(s) => Ok(vector(Column::Char(s.chars().collect()))),
+            Token::BoolList(bits) => Ok(vector(Column::Bool(bits.clone()))),
             Token::Symbol(s) => Ok(Expr::Symbol(s.clone())),
             Token::LeftParen => {
+                if self.check(&Token::RightParen) || self.check(&Token::Semicolon) {
+                    return Err(QError::Nyi("general lists".into()));
+                }
                 let expr = self.expression()?;
+                if self.check(&Token::Semicolon) {
+                    return Err(QError::Nyi("general lists".into()));
+                }
                 if !self.match_tokens(&[Token::RightParen]) {
                     return Err(nyi_token(self.peek())
                         .unwrap_or_else(|| QError::parse("expected ')' after expression")));
@@ -182,6 +221,36 @@ impl Parser {
                     .unwrap_or_else(|| QError::parse(format!("unexpected {}", token))))
             }
         }
+    }
+
+    /// A run of juxtaposed numbers: one atom, or a long vector, or a float
+    /// vector when any element is a float (long nulls become `0n`).
+    fn numeric_run(&mut self) -> QResult<Expr> {
+        let start = self.current;
+        while matches!(self.peek(), Token::Integer(_) | Token::Float(_)) {
+            self.current += 1;
+        }
+        let run = &self.tokens[start..self.current];
+        let to_float = |t: &Token| match t {
+            Token::Integer(i64::MIN) => f64::NAN,
+            Token::Integer(n) => *n as f64,
+            Token::Float(f) => *f,
+            _ => unreachable!("run holds numbers only"),
+        };
+        let any_float = run.iter().any(|t| matches!(t, Token::Float(_)));
+        Ok(match (run, any_float) {
+            ([Token::Integer(n)], _) => Expr::Lit(Value::Atom(Atom::Integer(*n))),
+            ([Token::Float(f)], _) => Expr::Lit(Value::Atom(Atom::Float(*f))),
+            (run, true) => vector(Column::Float(run.iter().map(to_float).collect())),
+            (run, false) => vector(Column::Long(
+                run.iter()
+                    .map(|t| match t {
+                        Token::Integer(n) => *n,
+                        _ => unreachable!("no floats in this run"),
+                    })
+                    .collect(),
+            )),
+        })
     }
 
     fn match_tokens(&mut self, types: &[Token]) -> bool {

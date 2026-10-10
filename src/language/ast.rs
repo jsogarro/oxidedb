@@ -1,8 +1,9 @@
-use crate::types::atom::Atom;
+use crate::types::value::Value;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
-    Atom(Atom),
+    /// A literal: an atom or a vector. Evaluating it is a reference-count bump.
+    Lit(Value),
     Symbol(String),
     BinaryOp {
         left: Box<Expr>,

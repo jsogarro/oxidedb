@@ -1,5 +1,4 @@
-//! Symbol, string and boolean-vector literal tokens (lexer only; the parser
-//! still reports them as not yet implemented).
+//! Symbol, string and boolean-vector literal tokens (lexer level).
 use oxidedb::language::lexer::Token;
 use oxidedb::{Atom, Interpreter, Lexer, QError};
 
@@ -106,10 +105,7 @@ fn lex_lists_bool_vector() {
         ]
     );
     // a trailing identifier character means the literal is malformed
-    assert_eq!(
-        lex("1bb"),
-        vec![Token::Integer(1), Token::Symbol("bb".into())]
-    );
+    assert_eq!(lex_err("1bb"), parse("invalid literal: 1b..."));
     for src in ["102b", "10b1", "10bx", "12b", "10b_"] {
         match lex_err(src) {
             QError::Parse(d) => assert!(d.starts_with("invalid literal"), "{src}: {d}"),
@@ -159,18 +155,25 @@ fn lex_lists_interplay() {
 }
 
 #[test]
-fn lex_lists_parser_rejects_as_nyi() {
-    let strings = "strings (a character literal holds exactly one character)";
-    for src in ["\"ab\"", "\"\"", "x:\"Alice\"", "1 \"ab\"", "\"ab\" 1"] {
-        assert_eq!(eval_err(src), QError::Nyi(strings.into()), "{src}");
+fn lex_lists_parser_evaluates_literals() {
+    for src in [
+        "\"ab\"",
+        "\"\"",
+        "x:\"Alice\"",
+        "`a",
+        "`",
+        "`a`b`c",
+        "x:`a",
+        "(`a)",
+        "101b",
+        "00b",
+    ] {
+        assert!(Interpreter::new().eval_line(src).is_ok(), "{src}");
     }
-    for src in ["`a", "`", "`a`b`c", "x:`a", "1 `a", "(`a)", "1+`a"] {
-        assert_eq!(eval_err(src), QError::Nyi("symbols".into()), "{src}");
+    let nyi = QError::Nyi("application".into());
+    for src in ["1 \"ab\"", "\"ab\" 1", "1 `a", "1+`a 1", "101b 1"] {
+        assert_eq!(eval_err(src), nyi, "{src}");
     }
-    for src in ["101b", "00b", "1+101b", "101b 1"] {
-        assert_eq!(eval_err(src), QError::Nyi("boolean lists".into()), "{src}");
-    }
-    assert_eq!(eval_err("`a").to_string(), "'nyi: symbols");
 }
 
 #[test]
@@ -279,10 +282,7 @@ fn lex_lists_minus_never_folds_into_a_boolean() {
         vec![Token::Integer(2), Token::Minus, Token::Boolean(true)]
     );
     // still a number when no boolean follows
-    assert_eq!(
-        lex("-1bc"),
-        vec![Token::Integer(-1), Token::Symbol("bc".into())]
-    );
+    assert_eq!(lex_err("-1bc"), parse("invalid literal: -1b..."));
     assert_eq!(lex("-12"), vec![Token::Integer(-12)]);
 }
 

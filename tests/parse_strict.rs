@@ -54,7 +54,7 @@ fn assert_parse_err(src: &str) {
 
 #[test]
 fn parse_strict_trailing_tokens_rejected() {
-    for src in ["1 2", "3 )", "1;2", "1:2", "2x"] {
+    for src in ["1 2 )", "3 )", "1;2", "1:2", "2x"] {
         assert_parse_err(src);
     }
 }

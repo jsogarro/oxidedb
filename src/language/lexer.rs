@@ -385,7 +385,33 @@ impl Lexer {
         rest.get(digits) == Some(&'b') && !rest.get(digits + 1).is_some_and(|c| is_ident_char(*c))
     }
 
+    /// A number must not run straight into a letter or `_` (`2x`, `1E3`, `1j`):
+    /// like a glued literal, that is an invalid literal rather than two tokens.
     fn read_number(&mut self) -> QResult<Token> {
+        let start = self.position;
+        let token = self.read_number_body()?;
+        if self.current_char.is_some_and(is_ident_char) {
+            let text: String = self.input[start..=self.position].iter().collect();
+            return Err(QError::parse(format!("invalid literal: {text}...")));
+        }
+        Ok(token)
+    }
+
+    /// True when whitespace is followed by a number literal (`1f 2`, `1f -2`).
+    fn number_follows_after_space(&self) -> bool {
+        let rest = &self.input[self.position..];
+        let spaces = rest.iter().take_while(|c| c.is_whitespace()).count();
+        let mut it = rest[spaces..].iter();
+        spaces > 0
+            && match (it.next(), it.next(), it.next()) {
+                (Some(c), _, _) if c.is_ascii_digit() => true,
+                (Some('.'), Some(d), _) | (Some('-'), Some(d), _) if d.is_ascii_digit() => true,
+                (Some('-'), Some('.'), Some(d)) => d.is_ascii_digit(),
+                _ => false,
+            }
+    }
+
+    fn read_number_body(&mut self) -> QResult<Token> {
         let mut number = String::new();
         let mut is_float = false;
 
@@ -486,6 +512,10 @@ impl Lexer {
         if self.current_char == Some('f') && !self.ident_char_at(1) {
             is_float = true;
             self.advance();
+            // q allows the `f` suffix only on the last item of a run (`1 2 3f`).
+            if self.number_follows_after_space() {
+                return Err(QError::parse(format!("invalid literal: {number}f...")));
+            }
         }
 
         // A `b` that did not make a boolean literal (`2b`, `1.0b`, `1e3b`).

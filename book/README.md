@@ -7,10 +7,10 @@ A comprehensive guide to the O programming language and OxideDB database system.
 - [Introduction](chapters/00-introduction.md)
 - [Chapter 1: Atoms and Basic Arithmetic](chapters/01-atoms-and-arithmetic.md)
 - [Chapter 2: Variables and Assignment](chapters/02-variables-and-assignment.md)
+- [Chapter 3: Vectors and Lists](chapters/03-vectors-and-lists.md) (in progress: literals and arithmetic so far)
 
 ### Coming Soon
 
-- Chapter 3: Vectors and Lists
 - Chapter 4: Dictionaries and Tables  
 - Chapter 5: Functions and Control Flow
 - Chapter 6: Advanced Operations
@@ -39,6 +39,7 @@ The `book/examples` directory contains executable O files demonstrating the conc
 ```bash
 cargo run -- book/examples/01-atoms-and-arithmetic.o
 cargo run -- book/examples/02-variables-and-assignment.o
+cargo run -- book/examples/03-vectors-and-lists.o
 ```
 
 Each file includes detailed comments explaining the expected output. `cargo test --test book_examples` evaluates every `// Expected output:` line and every `oxidedb>` sample in the chapters, so the book fails the build when it drifts from the interpreter.

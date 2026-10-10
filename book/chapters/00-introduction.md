@@ -12,7 +12,7 @@ O combines the expressiveness of Q with modern language design principles:
 
 - **Concise Syntax**: Express complex operations in few characters
 - **Right-to-Left Evaluation**: Natural mathematical evaluation order  
-- **Array-Oriented**: Designed for working with collections of data (collections arrive in Chapter 3; so far O handles single values)
+- **Array-Oriented**: Designed for working with collections of data (Chapter 3 starts on vectors: a whole list of values in one go)
 - **Interactive**: Immediate feedback through the REPL
 - **Strict About Types**: Combinations that make no sense are errors, not silent conversions (for example, `1 + "a"`)
 
@@ -22,7 +22,7 @@ OxideDB provides an interactive environment where you can:
 - Execute O expressions immediately
 - Define variables and reuse their values
 
-Vectors, tables and queries are still to come. Chapter 3 starts on collections.
+Vector literals and vector arithmetic work (Chapter 3). Tables and queries are still to come.
 
 ## Getting Started
 
@@ -57,7 +57,7 @@ oxidedb> 2 + 3
 
 Before diving in, understand these fundamental concepts:
 
-1. **Atoms**: Individual values (numbers, booleans and characters; symbols come later)
+1. **Atoms**: Individual values (numbers, booleans, characters and symbols)
 2. **Right-to-Left Evaluation**: `2 + 3 * 4` equals `14`, not `10`
 3. **Variables**: Store values using `:` (e.g., `x:5`)
 4. **Types**: O is dynamically typed. The type belongs to the value, not the variable, so `x:5` followed by `x:2.5` is fine

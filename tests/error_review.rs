@@ -1,5 +1,5 @@
 //! Error wording, kinds and exact output channels (review follow-ups).
-use oxidedb::{Interpreter, Lexer, QError};
+use oxidedb::{Lexer, QError};
 use std::io::Write;
 use std::process::{Command, Output, Stdio};
 
@@ -7,15 +7,9 @@ fn lex_err(src: &str) -> QError {
     Lexer::new(src).tokenize().expect_err(src)
 }
 
-fn eval_err(src: &str) -> QError {
-    Interpreter::new().eval_line(src).expect_err(src)
-}
-
 fn parse(detail: &str) -> QError {
     QError::Parse(detail.into())
 }
-
-const STRINGS: &str = "strings (a character literal holds exactly one character)";
 
 #[test]
 fn lexer_details_are_lowercase() {
@@ -54,22 +48,8 @@ fn bare_quote_is_parse() {
 }
 
 #[test]
-fn terminated_strings_are_not_yet_implemented() {
-    for src in ["\"ab\"", "\"\"", "x:\"Alice\""] {
-        assert_eq!(eval_err(src), QError::Nyi(STRINGS.into()), "{src}");
-    }
-    assert_eq!(eval_err("\"ab\"").to_string(), format!("'nyi: {STRINGS}"));
-}
-
-#[test]
 fn triple_quote_is_an_unterminated_literal() {
     assert_eq!(lex_err("\"\"\""), parse("unterminated character literal"));
-}
-
-#[test]
-fn symbols_are_not_yet_implemented() {
-    assert_eq!(eval_err("`a"), QError::Nyi("symbols".into()));
-    assert_eq!(eval_err("`a").to_string(), "'nyi: symbols");
 }
 
 #[test]

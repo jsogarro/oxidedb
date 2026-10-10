@@ -12,7 +12,7 @@ OxideDB aims to provide the power and expressiveness of Q/KDB+ with Rust's memor
 - **Interactive REPL**: Full-featured Read-Eval-Print Loop with command history
 - **File Execution**: Run O scripts directly from files (.o extension)
 - **Variable System**: Named values held in memory for the length of a session (nothing is saved to disk; REPL input history is kept in `~/.oxidedb_history`)
-- **Type System**: Integers, floats, booleans and characters, with null and infinity values (`0N`, `0n`, `0w`) (symbol literals are not implemented yet)
+- **Type System**: Integers, floats, booleans, characters and symbols, with null and infinity values (`0N`, `0n`, `0w`), and vectors
 - **Comprehensive Documentation**: "O for Humans" book with executable examples
 - **Memory Safety**: Written in safe Rust
 
@@ -45,6 +45,7 @@ Execute O script files directly:
 # Run example files
 cargo run -- book/examples/01-atoms-and-arithmetic.o
 cargo run -- book/examples/02-variables-and-assignment.o
+cargo run -- book/examples/03-vectors-and-lists.o
 
 # Run any .o file
 cargo run -- path/to/your/script.o
@@ -72,7 +73,9 @@ Phase 1 of the O language implementation is **complete** with a fully functional
 - ✅ **Complete O Language Parser**: Lexer, parser, and AST generation for O syntax
 - ✅ **Right-to-Left Evaluation**: Proper Q-style expression evaluation (e.g., `1 + 2 * 3` = `7`)
 - ✅ **Variable System**: Assignment (`x:5`) and retrieval, held in memory for the session
-- ✅ **Atom Types**: Integers, floats, booleans and characters with q-style type codes
+- ✅ **Atom Types**: Integers, floats, booleans, characters and symbols with q-style type codes
+- ✅ **Vector Literals**: long, float, boolean, symbol and character vectors (strings)
+- ✅ **Vector Arithmetic**: `+ - * %` item by item, with broadcasting of atoms
 - ✅ **Interactive REPL**: Full-featured environment with command history and error handling
 - ✅ **File Execution**: Run .o script files with line-by-line execution and error reporting
 - ✅ **Testing**: integration and property tests, plus tests that run every example in the book
@@ -87,10 +90,12 @@ Phase 1 of the O language implementation is **complete** with a fully functional
 - ✅ Variable assignment and retrieval (`:` operator)
 - ✅ Interactive REPL with file execution support
 
-#### Phase 2: Vectors and Lists (book Chapter 3)
-- ⏳ Vector creation and manipulation
+#### Phase 2: Vectors and Lists (book Chapter 3) 🚧 **IN PROGRESS**
+- ✅ Vector literals (`1 2 3`, `1 2.5 3`, `101b`, `` `a`b ``, `"abc"`), symbol atoms and vector arithmetic
+- ⏳ Vector creation and manipulation (`til`, `count`, take, join)
 - ⏳ Indexing and slicing
-- ⏳ Basic vector operations (arithmetic, comparison)
+- ✅ Vector arithmetic (`+ - * %` on atoms and vectors)
+- ⏳ Comparison in the language (the kernel exists, the parser does not accept `=` `<` yet)
 - ⏳ Type-preserving operations
 
 #### Phase 3: Dictionaries and Tables (book Chapter 4)
@@ -131,6 +136,10 @@ oxidedb> y
 20
 oxidedb> 2.5 + 1.5    // Float arithmetic
 4f
+oxidedb> 1 2.5 3      // A vector literal; one float promotes all
+1 2.5 3
+oxidedb> 1 2 3 + 10   // Arithmetic applies to every item
+11 12 13
 oxidedb> \\
 Goodbye!
 ```
@@ -153,6 +162,7 @@ Complete guide to the O programming language located in `/book/`:
 - **Introduction**: Overview of O and OxideDB
 - **Chapter 1**: Atoms and Basic Arithmetic
 - **Chapter 2**: Variables and Assignment
+- **Chapter 3**: Vectors and Lists (in progress: vector literals and arithmetic)
 
 ### Executable Examples
 Run interactive examples from the book:
@@ -185,10 +195,12 @@ While O is inspired by Q, there are some important differences:
 
 - **Language Name**: O (instead of Q)
 - **File Extension**: `.o` files (instead of `.q`)
-- **Division Operator**: `%` (same as Q): always returns a float, and division by zero follows IEEE 754 (`1%0` is `0w`)
+- **Division Operator**: `%` (as in q): always returns a float, and division by zero follows IEEE 754 (`1%0` is `0w`)
 - **Deliberate deviations**: integer overflow is an error (q wraps around), and an out-of-range float literal such as `1e999` is an error. Nulls (`0N`, `0n`) propagate through arithmetic.
-- **Exit Commands**: `exit`, `quit`, or `\\` (Q standard)
-- **Right-to-Left Evaluation**: Fully implemented like Q
+- **Exit Commands**: `\\` is q's; `exit` and `quit` are O conveniences
+- **Right-to-Left Evaluation**: as in q
+- **Booleans in arithmetic**: `1b+1` is `2` in both; `1b+1b` is an int in q and a long in O
+- **Assignment echo**: q prints nothing for `x:5`; O shows the value
 
 ## References
 

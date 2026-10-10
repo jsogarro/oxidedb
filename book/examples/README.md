@@ -13,6 +13,7 @@ cargo run -- book/examples/filename.o
 
 - `01-atoms-and-arithmetic.o` - Basic atoms and arithmetic operations
 - `02-variables-and-assignment.o` - Variable assignment and usage
+- `03-vectors-and-lists.o` - Vector literals (longs, floats, booleans, symbols, strings) and arithmetic on vectors
 
 ## File Format
 
@@ -46,3 +47,5 @@ Each line of output corresponds to the result of executing an O expression from 
 ## Checking the Examples
 
 `cargo test --test book_examples` runs each file in its own interpreter session. The next line that prints something after a `// Expected output: X` comment must print exactly `X`. Put any explanation on a separate comment line, and keep the marker in that exact form: a misspelled marker fails the test.
+
+Example files contain only lines that succeed: they must run to completion (`cargo run -- book/examples/NN-name.o` exits 0), and the test fails if an expected result is an error. Error samples live only in the chapter transcripts, which are checked too.

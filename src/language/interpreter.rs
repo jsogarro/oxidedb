@@ -47,7 +47,7 @@ impl Interpreter {
 
     pub fn evaluate(&mut self, expr: Expr) -> QResult<Value> {
         match expr {
-            Expr::Atom(atom) => Ok(Value::Atom(atom)),
+            Expr::Lit(value) => Ok(value),
             Expr::Symbol(name) => self
                 .variables
                 .get(&name)

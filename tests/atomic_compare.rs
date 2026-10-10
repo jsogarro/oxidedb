@@ -479,7 +479,7 @@ fn cmp_through_the_interpreter() {
     i.set("v", lv(&[1, 2, 3]));
     i.set("w", lv(&[3, 2, 1]));
     let var = |n: &str| Expr::Symbol(n.into());
-    let int = |n: i64| Expr::Atom(Atom::Integer(n));
+    let int = |n: i64| Expr::Lit(Value::Atom(Atom::Integer(n)));
     assert_eq!(
         i.evaluate(node(Verb::Greater, var("v"), int(1))),
         Ok(bv(&[false, true, true]))
@@ -489,7 +489,11 @@ fn cmp_through_the_interpreter() {
         Ok(bv(&[true, false, false]))
     );
     assert_eq!(
-        i.evaluate(node(Verb::Equal, int(1), Expr::Atom(Atom::Float(1.0)))),
+        i.evaluate(node(
+            Verb::Equal,
+            int(1),
+            Expr::Lit(Value::Atom(Atom::Float(1.0)))
+        )),
         Ok(b(true))
     );
     assert_eq!(
@@ -500,7 +504,7 @@ fn cmp_through_the_interpreter() {
         i.evaluate(node(
             Verb::NotEqual,
             var("v"),
-            Expr::Atom(Atom::Symbol(Sym::intern("a")))
+            Expr::Lit(Value::Atom(Atom::Symbol(Sym::intern("a"))))
         )),
         Err(QError::Type)
     );
