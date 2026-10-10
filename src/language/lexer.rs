@@ -1,5 +1,14 @@
-use anyhow::{anyhow, Result};
+use crate::error::QError;
+use crate::types::atom::Atom;
 use std::fmt;
+
+type Result<T> = std::result::Result<T, QError>;
+
+macro_rules! perr {
+    ($($arg:tt)*) => {
+        QError::Parse(format!($($arg)*))
+    };
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
@@ -38,10 +47,10 @@ pub enum Token {
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Token::Integer(n) => write!(f, "{}", n),
-            Token::Float(n) => write!(f, "{}", n),
-            Token::Boolean(b) => write!(f, "{}", if *b { "1b" } else { "0b" }),
-            Token::Character(c) => write!(f, "\"{}\"", c),
+            Token::Integer(n) => write!(f, "{}", Atom::Integer(*n)),
+            Token::Float(n) => write!(f, "{}", Atom::Float(*n)),
+            Token::Boolean(b) => write!(f, "{}", Atom::Boolean(*b)),
+            Token::Character(c) => write!(f, "{}", Atom::Character(*c)),
             Token::Symbol(s) => write!(f, "{}", s),
             Token::Plus => write!(f, "+"),
             Token::Minus => write!(f, "-"),
@@ -61,11 +70,11 @@ impl fmt::Display for Token {
     }
 }
 
-fn bad_identifier_char(ch: char) -> anyhow::Error {
+fn bad_identifier_char(ch: char) -> QError {
     if ch == '_' {
-        anyhow!("Invalid identifier: a name must start with a letter, not '_'")
+        perr!("Invalid identifier: a name must start with a letter, not '_'")
     } else {
-        anyhow!("Invalid identifier: non-ASCII character '{ch}'; names are ASCII letters, digits and '_'")
+        perr!("Invalid identifier: non-ASCII character '{ch}'; names are ASCII letters, digits and '_'")
     }
 }
 
@@ -169,7 +178,7 @@ impl Lexer {
                 ch if ch.is_ascii_digit() => self.read_number(),
                 ch if ch.is_ascii_alphabetic() => self.read_identifier(),
                 ch if ch.is_alphanumeric() || ch == '_' => Err(bad_identifier_char(ch)),
-                _ => Err(anyhow!("Unexpected character: {}", ch)),
+                _ => Err(perr!("Unexpected character: {}", ch)),
             },
         }
     }
@@ -278,12 +287,12 @@ impl Lexer {
                 } else {
                     f64::INFINITY
                 })),
-                Some('W') => return Err(anyhow!("Long infinity 0W is not supported")),
+                Some('W') => return Err(QError::Nyi("Long infinity 0W is not supported".into())),
                 _ => None,
             };
             if let Some(token) = literal {
                 if self.ident_char_at(1) {
-                    return Err(anyhow!(
+                    return Err(perr!(
                         "Invalid literal: {}{}...",
                         number,
                         self.current_char.unwrap_or(' ')
@@ -303,7 +312,7 @@ impl Lexer {
                 self.advance();
             }
             if !self.current_char.is_some_and(|c| c.is_ascii_digit()) {
-                return Err(anyhow!("Invalid float: exponent needs digits after 'e'"));
+                return Err(perr!("Invalid float: exponent needs digits after 'e'"));
             }
             while let Some(ch) = self.current_char.filter(char::is_ascii_digit) {
                 number.push(ch);
@@ -319,15 +328,15 @@ impl Lexer {
         if is_float {
             let value = number
                 .parse::<f64>()
-                .map_err(|_| anyhow!("Invalid float: {}", number))?;
+                .map_err(|_| perr!("Invalid float: {}", number))?;
             if !value.is_finite() {
-                return Err(anyhow!("Float out of range: {}", number));
+                return Err(perr!("Float out of range: {}", number));
             }
             Ok(Token::Float(value))
         } else {
             let value = number
                 .parse::<i64>()
-                .map_err(|_| anyhow!("Invalid integer: {}", number))?;
+                .map_err(|_| perr!("Invalid integer: {}", number))?;
             Ok(Token::Integer(value))
         }
     }
@@ -352,14 +361,14 @@ impl Lexer {
 
         let ch = self
             .current_char
-            .ok_or_else(|| anyhow!("Unterminated character literal"))?;
+            .ok_or_else(|| perr!("Unterminated character literal"))?;
         self.advance();
 
         if self.current_char == Some('"') {
             self.advance(); // Skip closing quote
             Ok(Token::Character(ch))
         } else {
-            Err(anyhow!("Unterminated character literal"))
+            Err(perr!("Unterminated character literal"))
         }
     }
 }

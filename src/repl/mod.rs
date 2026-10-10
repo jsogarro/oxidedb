@@ -1,6 +1,6 @@
+use crate::error::QError;
 use crate::language::interpreter::Interpreter;
 use anyhow::Result;
-use colored::*;
 use rustyline::{error::ReadlineError, DefaultEditor};
 use std::io::IsTerminal;
 use std::{fs, path::PathBuf};
@@ -55,7 +55,7 @@ impl Repl {
                     match self.eval_line(line) {
                         Ok(Some(result)) => println!("{}", result),
                         Ok(None) => {}
-                        Err(e) => eprintln!("{}: {}", "Error".red(), e),
+                        Err(e) => eprintln!("{}", e),
                     }
                 }
                 // Ctrl-C cancels the current line; the session continues.
@@ -73,7 +73,8 @@ impl Repl {
         Ok(())
     }
 
-    /// Runs a file; the first failing line aborts with an error naming the line.
+    /// Runs a file; the first failing line aborts with an error naming the line
+    /// (`'type (line 3)`).
     /// The caller reports the error (once).
     pub fn run_file(&mut self, filename: &str) -> Result<()> {
         let content = fs::read_to_string(filename)?;
@@ -87,7 +88,7 @@ impl Repl {
 
             let result = self
                 .eval_line(line)
-                .map_err(|e| anyhow::anyhow!("at line {}: {}", line_num + 1, e))?;
+                .map_err(|e| anyhow::anyhow!("{} (line {})", e, line_num + 1))?;
             if let Some(result) = result {
                 println!("{}", result);
             }
@@ -97,7 +98,7 @@ impl Repl {
     }
 
     /// Evaluates one line; `None` for input with no tokens (e.g. a comment).
-    pub fn eval_line(&mut self, input: &str) -> Result<Option<String>> {
+    pub fn eval_line(&mut self, input: &str) -> Result<Option<String>, QError> {
         Ok(self.interpreter.eval_line(input)?.map(|a| a.to_string()))
     }
 }

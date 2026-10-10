@@ -95,7 +95,7 @@ fn comment_glued_slash_is_not_comment() {
 fn glued_adverbs_are_not_yet_implemented() {
     for src in ["1/2", "1\\2", "1+/2", "1+\\2", "(1)/"] {
         let msg = parse_err(src);
-        assert!(msg.contains("not yet implemented"), "{src}: {msg}");
+        assert!(msg.starts_with("'nyi: adverb"), "{src}: {msg}");
     }
 }
 

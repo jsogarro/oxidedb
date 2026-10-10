@@ -1,17 +1,19 @@
+use crate::error::QError;
 use crate::language::ast::{BinaryOperator, Expr, UnaryOperator};
 use crate::language::{
     lexer::{Lexer, Token},
     parser::Parser,
 };
 use crate::types::atom::Atom;
-use anyhow::{anyhow, Result};
 use std::collections::HashMap;
+
+type Result<T> = std::result::Result<T, QError>;
 
 /// i64::MIN is reserved for the long null, so producing it counts as overflow.
 fn checked(result: Option<i64>) -> Result<Atom> {
     match result {
         Some(n) if n != i64::MIN => Ok(Atom::Integer(n)),
-        _ => Err(anyhow!("Integer overflow")),
+        _ => Err(QError::Overflow),
     }
 }
 
@@ -59,7 +61,7 @@ impl Interpreter {
                 .variables
                 .get(&name)
                 .cloned()
-                .ok_or_else(|| anyhow!("Undefined variable: {}", name)),
+                .ok_or(QError::Undefined(name)),
             Expr::BinaryOp {
                 left,
                 operator,
@@ -118,12 +120,7 @@ impl Interpreter {
                 self.apply_binary_op(&Atom::Float(*a), op, &Atom::Float(long_to_float(*b)))
             }
 
-            _ => Err(anyhow!(
-                "Invalid binary operation: {:?} {:?} {:?}",
-                left,
-                op,
-                right
-            )),
+            _ => Err(QError::Type),
         }
     }
 
@@ -132,7 +129,7 @@ impl Interpreter {
             (UnaryOperator::Negate, Atom::Integer(i64::MIN)) => Ok(Atom::Integer(i64::MIN)),
             (UnaryOperator::Negate, Atom::Integer(n)) => checked(n.checked_neg()),
             (UnaryOperator::Negate, Atom::Float(f)) => Ok(Atom::Float(-f)),
-            _ => Err(anyhow!("Invalid unary operation: {:?} {:?}", op, operand)),
+            _ => Err(QError::Type),
         }
     }
 }

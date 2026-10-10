@@ -42,7 +42,7 @@ oxidedb> x1:100
 A leading underscore is rejected:
 ```
 oxidedb> _a:1
-Error: Invalid identifier: a name must start with a letter, not '_'
+'parse: Invalid identifier: a name must start with a letter, not '_'
 ```
 
 A name that starts with a digit is an error: `1x:2` is read as the number `1` followed by a stray name.
@@ -174,7 +174,7 @@ oxidedb> result
 If you try to use a variable that doesn't exist, O will give you an error:
 ```
 oxidedb> undefined_variable
-Error: Undefined variable: undefined_variable
+'undefined_variable (Undefined variable)
 ```
 
 ## Exercises

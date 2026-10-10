@@ -14,7 +14,7 @@ fn main() -> Result<()> {
 
         let mut repl = Repl::new();
         if let Err(e) = repl.run_file(filename) {
-            eprintln!("{}: {}", "Error".red(), e);
+            eprintln!("{}", e);
             std::process::exit(1);
         }
         Ok(())

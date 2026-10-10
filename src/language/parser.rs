@@ -1,12 +1,18 @@
+use crate::error::QError;
 use crate::language::{
     ast::{BinaryOperator, Expr, UnaryOperator},
     lexer::Token,
 };
 use crate::types::atom::Atom;
-use anyhow::{anyhow, Result};
 
-fn adverb_nyi(token: &Token) -> anyhow::Error {
-    anyhow!("adverb '{}' not yet implemented", token)
+type Result<T> = std::result::Result<T, QError>;
+
+fn adverb_nyi(token: &Token) -> QError {
+    QError::Nyi(format!("adverb '{}'", token))
+}
+
+fn parse_err(msg: impl Into<String>) -> QError {
+    QError::Parse(msg.into())
 }
 
 pub struct Parser {
@@ -38,17 +44,17 @@ impl Parser {
             if matches!(self.peek(), Token::Over | Token::Scan) {
                 return Err(adverb_nyi(self.peek()));
             }
-            return Err(anyhow!(
-                "Unexpected token after expression: {:?}",
+            return Err(parse_err(format!(
+                "unexpected {} after expression",
                 self.peek()
-            ));
+            )));
         }
         Ok(expr)
     }
 
     fn expression(&mut self) -> Result<Expr> {
         if self.depth >= MAX_DEPTH {
-            return Err(anyhow!("expression nested too deeply"));
+            return Err(parse_err("expression nested too deeply"));
         }
         self.depth += 1;
         let result = self.assignment();
@@ -104,7 +110,7 @@ impl Parser {
             });
             // The AST is still a right-nested tree, which evaluate and drop recurse over.
             if operators.len() >= MAX_CHAIN {
-                return Err(anyhow!("expression too long"));
+                return Err(parse_err("expression too long"));
             }
         }
         let mut right = operands.pop().expect("at least one operand");
@@ -134,7 +140,7 @@ impl Parser {
 
     fn primary(&mut self) -> Result<Expr> {
         if self.is_at_end() {
-            return Err(anyhow!("Unexpected end of input"));
+            return Err(parse_err("unexpected end of input"));
         }
         match self.advance() {
             Token::Integer(n) => Ok(Expr::Atom(Atom::Integer(*n))),
@@ -145,12 +151,12 @@ impl Parser {
             Token::LeftParen => {
                 let expr = self.expression()?;
                 if !self.match_tokens(&[Token::RightParen]) {
-                    return Err(anyhow!("Expected ')' after expression"));
+                    return Err(parse_err("expected ')' after expression"));
                 }
                 Ok(expr)
             }
             token @ (Token::Over | Token::Scan) => Err(adverb_nyi(token)),
-            token => Err(anyhow!("Unexpected token: {:?}", token)),
+            token => Err(parse_err(format!("unexpected {}", token))),
         }
     }
 

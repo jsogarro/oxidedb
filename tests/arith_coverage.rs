@@ -3,7 +3,7 @@ use oxidedb::{Atom, Interpreter, Lexer, Parser};
 fn eval(src: &str) -> anyhow::Result<Atom> {
     let tokens = Lexer::new(src).tokenize()?;
     let ast = Parser::new(tokens).parse()?;
-    Interpreter::new().evaluate(ast)
+    Ok(Interpreter::new().evaluate(ast)?)
 }
 
 #[test]
