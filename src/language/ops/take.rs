@@ -21,7 +21,7 @@ fn count(left: &Value) -> QResult<i64> {
 
 pub fn dyad(left: &Value, right: &Value) -> QResult<Value> {
     let n = count(left)?;
-    let len = checked_len(n.checked_abs().ok_or(QError::Domain)?)?;
+    let len = checked_len(i64::try_from(n.unsigned_abs()).unwrap_or(i64::MAX))?;
     match right {
         Value::Vector(c) => c.take(n).map(|c| Value::Vector(Rc::new(c))),
         Value::Atom(a) => match Column::from_atoms(std::slice::from_ref(a)) {

@@ -7,14 +7,6 @@ use crate::types::column::{checked_len, Column};
 use crate::types::value::Value;
 use std::rc::Rc;
 
-fn is_empty(v: &Value) -> bool {
-    match v {
-        Value::Atom(_) => false,
-        Value::Vector(c) => c.is_empty(),
-        Value::List(l) => l.is_empty(),
-    }
-}
-
 fn len(v: &Value) -> usize {
     match v {
         Value::Atom(_) => 1,
@@ -41,34 +33,61 @@ fn column(v: &Value) -> Option<Column> {
     }
 }
 
-/// `x` as a list: an atom becomes a one-item list.
-fn listify(v: &Value) -> Value {
-    match v {
-        Value::Atom(_) => Value::from_items(vec![v.clone()]),
-        _ => v.clone(),
-    }
+/// The result length, `'domain` past the element cap.
+fn total_len(left: &Value, right: &Value) -> QResult<usize> {
+    checked_len(i64::try_from(len(left) + len(right)).unwrap_or(i64::MAX))
 }
 
 pub fn dyad(left: &Value, right: &Value) -> QResult<Value> {
-    checked_len(i64::try_from(len(left) + len(right)).unwrap_or(i64::MAX))?;
-    match (is_empty(left), is_empty(right)) {
-        // both empty: the right type, but () has none
-        (true, true) => Ok(if matches!(right, Value::List(_)) {
+    total_len(left, right)?;
+    // Nothing to normalise from: the result keeps the right type, but () has none.
+    if len(left) + len(right) == 0 {
+        return Ok(if matches!(right, Value::List(_)) {
             left
         } else {
             right
         }
-        .clone()),
-        (true, false) => Ok(listify(right)),
-        (false, true) => Ok(listify(left)),
-        (false, false) => Ok(
-            match column(left)
-                .zip(column(right))
-                .and_then(|(a, b)| a.concat(&b))
-            {
-                Some(c) => Value::Vector(Rc::new(c)),
-                None => Value::from_items([items(left), items(right)].concat()),
-            },
-        ),
+        .clone());
+    }
+    Ok(
+        match column(left)
+            .zip(column(right))
+            .and_then(|(a, b)| a.concat(&b))
+        {
+            Some(c) => Value::Vector(Rc::new(c)),
+            None => Value::from_items([items(left), items(right)].concat()),
+        },
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::error::QError;
+    use crate::types::atom::Atom;
+    use crate::types::column::MAX_ELEMS;
+
+    fn general(n: usize) -> Value {
+        Value::List(Rc::new(vec![Value::Atom(Atom::Boolean(true)); n]))
+    }
+
+    #[test]
+    fn join_len_counts_general_list_items() {
+        let one = Value::Atom(Atom::Integer(1));
+        assert_eq!(len(&general(3)), 3);
+        assert_eq!(total_len(&general(3), &one), Ok(4));
+        assert_eq!(total_len(&one, &general(3)), Ok(4));
+    }
+
+    #[test]
+    fn join_cap_applies_to_general_lists() {
+        // building a list at the real cap would cost hundreds of MB, so the
+        // pure length check is tested at the cap and one real join below it
+        let one = Value::Atom(Atom::Integer(1));
+        let empty = Value::List(Rc::default());
+        assert_eq!(total_len(&general(MAX_ELEMS), &empty), Ok(MAX_ELEMS));
+        assert_eq!(total_len(&general(MAX_ELEMS), &one), Err(QError::Domain));
+        assert_eq!(total_len(&one, &general(MAX_ELEMS)), Err(QError::Domain));
+        assert_eq!(dyad(&general(4), &empty).map(|v| len(&v)), Ok(4));
     }
 }

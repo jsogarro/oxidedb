@@ -647,3 +647,12 @@ fn arith_length_is_checked_before_type() {
         assert_eq!(dyad(verb, &lv(&[1, 2, 3]), &sym_atom), Err(QError::Type));
     }
 }
+
+// Deliberate deviation: lengths are checked first for every verb. q reports
+// 'type for `1 2 3-`a`b` (subtract with a symbol vector on the right) but
+// 'length for every other verb and for the mirrored `` `a`b-1 2 3 ``.
+#[test]
+fn arith_subtract_symbol_vector_length_first() {
+    assert_eq!(sub(&lv(&[1, 2, 3]), &sv(&["a", "b"])), Err(QError::Length));
+    assert_eq!(sub(&sv(&["a", "b"]), &lv(&[1, 2, 3])), Err(QError::Length));
+}
