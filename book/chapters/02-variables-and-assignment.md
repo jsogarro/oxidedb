@@ -140,16 +140,17 @@ oxidedb> initial
 "A"
 ```
 
-Strings such as `"Alice"` are not implemented yet. A double-quoted value holds exactly one character, so `name:"Alice"` is an error today:
+A double-quoted value with several characters is a string, a list of characters. It can be stored like any other value (Chapter 3 covers strings and other lists):
 ```
 oxidedb> name:"Alice"
-'nyi: strings (a character literal holds exactly one character)
+"Alice"
+oxidedb> name
+"Alice"
 ```
-Strings arrive in a later chapter.
 
 ## Working with Different Types
 
-Variables can store any atom: integer, float, boolean or character. The type belongs to the value, so the same name can hold a different type later.
+Variables can store any atom (integer, float, boolean, character or symbol) and, as the last section showed, lists too. The type belongs to the value, so the same name can hold a different type later.
 
 ```
 oxidedb> number:42
@@ -160,6 +161,8 @@ oxidedb> flag:1b
 1b
 oxidedb> letter:"X"
 "X"
+oxidedb> tag:`red
+`red
 ```
 
 O handles type conversions automatically in mixed expressions:
@@ -184,7 +187,7 @@ oxidedb> undefined_variable
 
 ## Exercises
 
-1. Create variables for your age and the first letter of your name, then display them
+1. Create variables for your age, your name as a string and the first letter of your name, then display them
 2. Calculate the area of a rectangle using width and height variables
 3. Create a temperature in Celsius and convert it to Fahrenheit using the formula: `F = 32 + (C * 9) % 5` (remember right-to-left evaluation; the result is a float, e.g. `77f` for 25)
 4. Try reassigning a variable and verify the new value
@@ -200,4 +203,4 @@ oxidedb> undefined_variable
 - O handles type conversions automatically
 - Undefined variables produce errors
 
-In the next chapter, we'll explore vectors - collections of atoms that enable powerful array operations.
+In the next chapter, we'll explore vectors: lists of values that you type and store as one unit.

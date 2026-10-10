@@ -7,8 +7,8 @@ OxideDB is currently a small q-inspired expression interpreter (the **O** langua
 ### `src/language/`
 
 - `lexer.rs`: turns a line of text into a `Vec<Token>` ending in `Token::Eof`. Handles integer and float literals, `1b`/`0b` booleans, `"c"` characters, `"abc"` strings (with `\" \\ \n \t \r` escapes), `` `a ``/`` `a`b `` symbols, `101b` boolean vectors, the comparison and punctuation tokens `= < > <> <= >= # , ! { } $ @ ' ': /: \: ::` (the parser reports these as not yet implemented), identifiers (variable names; a literal glued to another, as in `1.5.5` or `"ab""cd"`, is an invalid literal), the `0N`/`0n`/`0w` null and infinity literals, and `/` comments (a `/` at line start or after whitespace comments out the rest of the line).
-- `parser.rs`: builds an `Expr` from the tokens.
-- `ast.rs`: `Expr` (atom, symbol, binary op, unary op, assignment) the negate operator, and `Verb`, the binary verbs `+ - * % = < > <> <= >= # , !`. The parser produces only `+ - * %`; the rest are placeholders that evaluate to `'nyi`.
+- `parser.rs`: builds an `Expr` from the tokens. A run of juxtaposed number tokens becomes one literal: an atom for a single number, otherwise a long vector, or a float vector when any item is a float (a long null becomes `0n`). `Sym` is a symbol atom, `SymList` a symbol vector, `Str` a character vector, `BoolList` a boolean vector. A run longer than `MAX_ELEMS` is `'domain`; a boolean next to a number or another boolean is `'type`; any other noun directly after a noun (`1 "a"`, `x 1 2`) is `'nyi: application`.
+- `ast.rs`: `Expr` (literal `Lit(Value)`, symbol (a variable name), binary op, unary op, assignment), the negate operator, and `Verb`, the binary verbs `+ - * % = < > <> <= >= # , !`. The parser produces only `+ - * %`; the rest are placeholders that evaluate to `'nyi`.
 - `interpreter.rs`: evaluates an `Expr` against a `HashMap<String, Value>` of variables. `Interpreter::eval_line` runs the whole pipeline for one line.
 - `builtins.rs`: `lookup(name)` resolves a keyword to a `Builtin` (`name`, `arity`, `call`); `call(name, args)` wraps it. Keywords: `til` and `count`. `til` and `Column::take` share the `MAX_ELEMS` cap (10,000,000 elements, `'domain` beyond it). The interpreter does not resolve names to them yet.
 
@@ -16,7 +16,7 @@ OxideDB is currently a small q-inspired expression interpreter (the **O** langua
 
 - `atom.rs`: the scalar `Atom` enum (boolean, long, float, character, symbol, date, time, timestamp, and typed temporal nulls) with q type codes and q-style display.
 - `sym.rs`: interned symbols, a 4-byte handle into a process-global string table. Interned names are never freed.
-- `column.rs`: `Column`, a typed vector (bool, long, float, char, symbol). It is reachable through `Value::Vector`, but the language cannot create one yet. `index` (typed gather, typed nulls for bad indices), `take` (q `#`, cyclic, negative from the end) and `concat` (same type only) are the helpers indexing, take and join build on.
+- `column.rs`: `Column`, a typed vector (bool, long, float, char, symbol). Vector literals build one (`Value::Vector`). `index` (typed gather, typed nulls for bad indices), `take` (q `#`, cyclic, negative from the end) and `concat` (same type only) are the helpers indexing, take and join build on.
 - `value.rs`: `Value`, the result of evaluation (atom, vector or general list), its equality and display.
 - `display.rs`: q-style `Display` for `Column` (`1 2 3`, `1 2 3f`, `101b`, `` `a`b ``, `"abc"`) and the character escaping shared with `Atom`'s `Display`.
 
@@ -36,13 +36,13 @@ Evaluation returns a `Value` (`src/types/value.rs`): an `Atom`, a `Vector(Rc<Col
 
 Equality treats nulls as equal (`0n` equals `0n`, in atoms, columns and lists), while `0f` and `-0f` stay equal. `Value` also compares with `Atom` in both directions, so an atom result can be asserted directly. A general list prints one item per line, `()` when empty.
 
-Arithmetic is atom-only: an operand that is a vector or list gives `'nyi: vector arithmetic`. The parser produces the `Verb`s `+ - * %`; `= < > <> <= >= # , !` exist in the AST and give `'nyi: <verb>` until implemented.
+Literals are `Expr::Lit(Value)`, so evaluating one is a reference-count bump. Arithmetic is atom-only: an operand that is a vector or list gives `'nyi: vector arithmetic`. The parser produces the `Verb`s `+ - * %`; `= < > <> <= >= # , !` exist in the AST and give `'nyi: <verb>` until implemented.
 
-Symbol, date, time and timestamp atoms exist as types, but the language has no literal for them yet. Long, float, character and symbol nulls are sentinels, not separate variants: `Integer(i64::MIN)`, `Float(NaN)`, `Character(' ')`, `Symbol(Sym::NULL)`. Producing `i64::MIN` by arithmetic is reported as overflow. Only the temporal nulls have their own variants. Variables live in the interpreter's map for the length of the session and are not saved.
+Symbols have literals (`` `a `` is an atom, `` `a`b `` a vector); date, time and timestamp atoms exist as types, but the language has no literal for them yet. Long, float, character and symbol nulls are sentinels, not separate variants: `Integer(i64::MIN)`, `Float(NaN)`, `Character(' ')`, `Symbol(Sym::NULL)`. Producing `i64::MIN` by arithmetic is reported as overflow. Only the temporal nulls have their own variants. Variables live in the interpreter's map for the length of the session and are not saved.
 
 ## Error handling
 
-Lexing, parsing and evaluation return `Result<_, QError>` (`src/error.rs`). `QError` is a q-style error whose text is a quote and a short name: `'type`, `'overflow`, `'parse: <detail>`, `'<name> (Undefined variable)`, `'nyi: <detail>`; `length`, `rank`, `index`, `domain`, `stack` and `signal` are defined for later features. Malformed input and the limits above are `Parse`, features O does not have yet (`0W`, adverbs, strings, symbols) are `Nyi`, unsupported operand types are `Type`, and integer overflow is `Overflow`. Tokens appear in messages in source form (`'parse: unexpected -1 after expression`). The REPL prints the error text on stderr and keeps the session; `run_file` stops at the first failing line and prints the error once with its line number (`line 3: 'type`); the `QError` stays the source of the returned `anyhow` error, and the process exits with status 1.
+Lexing, parsing and evaluation return `Result<_, QError>` (`src/error.rs`). `QError` is a q-style error whose text is a quote and a short name: `'type`, `'overflow`, `'parse: <detail>`, `'<name> (Undefined variable)`, `'nyi: <detail>`; `length`, `rank`, `index`, `domain`, `stack` and `signal` are defined for later features. Malformed input and the limits above are `Parse`, features O does not have yet (`0W`, adverbs, application) are `Nyi`, unsupported operand types are `Type`, and integer overflow is `Overflow`. Tokens appear in messages in source form (`'parse: unexpected -1 after expression`). The REPL prints the error text on stderr and keeps the session; `run_file` stops at the first failing line and prints the error once with its line number (`line 3: 'type`); the `QError` stays the source of the returned `anyhow` error, and the process exits with status 1.
 
 ## Testing
 
@@ -57,7 +57,7 @@ There are no `#[cfg(test)]` modules in `src/`.
 
 Not implemented; nothing here is partially present.
 
-- Vector and list literals, indexing and vector arithmetic (the `Value` type exists; the language cannot yet build one).
+- Indexing, vector arithmetic and general (mixed or nested) list literals. Vector literals of one type already work.
 - Dictionaries and tables, and queries over them.
 - Functions, conditionals and adverbs.
 - Persistence of variables and tables.

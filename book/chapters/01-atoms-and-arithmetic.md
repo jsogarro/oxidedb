@@ -103,7 +103,7 @@ oxidedb> 1b + 1
 ```
 
 ### Characters
-Single characters enclosed in double quotes (strings such as `"ab"` come in a later chapter):
+Single characters enclosed in double quotes (several characters in quotes make a string, which is a list of characters; see Chapter 3):
 ```
 oxidedb> "a"
 "a"
@@ -277,14 +277,14 @@ oxidedb> -5 + 3
 -2
 ```
 
-A minus sign glued to a number, with a space before it, is a negative literal, not subtraction. In q, `2 -1` reads as the two-item list `2 -1`; O has no lists yet, so it rejects the expression. Write `2 - 1` or `2-1` for subtraction:
+A minus sign glued to a number, with a space before it, is a negative literal, not subtraction. As in q, `2 -1` is therefore the two-item list `2 -1`, not subtraction (lists are the subject of Chapter 3). Write `2 - 1` or `2-1` for subtraction:
 ```
 oxidedb> 2 - 1
 1
 oxidedb> 2-1
 1
 oxidedb> 2 -1
-'parse: unexpected -1 after expression
+2 -1
 ```
 
 A minus applied to an expression (rather than glued to a number) negates everything to its right, so `-x+3` is `-(x+3)`:
@@ -321,9 +321,9 @@ oxidedb> 6/2
 
 - `'type`: the operands do not fit the operation
 - `'overflow`: an integer result left the 64-bit range
-- `'parse: ...`: the text is not valid O; the detail says what the parser or lexer saw, with tokens shown the way O prints them (`1 1e3` reports `1000f`)
+- `'parse: ...`: the text is not valid O; the detail says what the parser or lexer saw, with tokens shown the way O prints them (`1 )` reports `)`)
 - `'x (Undefined variable)`: the name `x` has not been assigned
-- `'nyi: ...`: not yet implemented; the detail names the missing feature, such as an adverb, a string or a symbol
+- `'nyi: ...`: not yet implemented; the detail names the missing feature, such as an adverb
 
 The error replaces the result and the session carries on. When you run a file, the first error stops the run and is printed once with its line number, for example `line 3: 'type`.
 

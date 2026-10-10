@@ -192,9 +192,9 @@ fn value_unimplemented_verbs_are_nyi() {
     ];
     for (operator, sym) in verbs {
         let expr = Expr::BinaryOp {
-            left: Box::new(Expr::Atom(Atom::Integer(1))),
+            left: Box::new(Expr::Lit(Value::Atom(Atom::Integer(1)))),
             operator,
-            right: Box::new(Expr::Atom(Atom::Integer(2))),
+            right: Box::new(Expr::Lit(Value::Atom(Atom::Integer(2)))),
         };
         assert_eq!(
             Interpreter::new().evaluate(expr),
@@ -202,9 +202,9 @@ fn value_unimplemented_verbs_are_nyi() {
         );
         // Mixed int/float must not fall into float promotion.
         let expr = Expr::BinaryOp {
-            left: Box::new(Expr::Atom(Atom::Integer(1))),
+            left: Box::new(Expr::Lit(Value::Atom(Atom::Integer(1)))),
             operator,
-            right: Box::new(Expr::Atom(Atom::Float(2.0))),
+            right: Box::new(Expr::Lit(Value::Atom(Atom::Float(2.0)))),
         };
         assert_eq!(
             Interpreter::new().evaluate(expr),
@@ -378,16 +378,16 @@ fn value_new_verbs_on_any_operand_are_nyi_by_verb() {
         (Atom::Character('a'), Atom::Character('b')),
     ] {
         let e = Expr::BinaryOp {
-            left: Box::new(Expr::Atom(l)),
+            left: Box::new(Expr::Lit(Value::Atom(l))),
             operator: Verb::Equal,
-            right: Box::new(Expr::Atom(r)),
+            right: Box::new(Expr::Lit(Value::Atom(r))),
         };
         assert_eq!(i.evaluate(e), Err(QError::Nyi("=".into())));
     }
     let e = Expr::BinaryOp {
         left: Box::new(Expr::Symbol("v".into())),
         operator: Verb::Take,
-        right: Box::new(Expr::Atom(Atom::Integer(1))),
+        right: Box::new(Expr::Lit(Value::Atom(Atom::Integer(1)))),
     };
     assert_eq!(i.evaluate(e), Err(QError::Nyi("#".into())));
 }

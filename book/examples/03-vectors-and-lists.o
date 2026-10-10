@@ -1,0 +1,107 @@
+// Chapter 3: Vectors and Lists Examples
+// Vector literals: longs, floats, booleans, symbols and strings
+
+// Long vectors
+// Expected output: 1 2 3
+1 2 3
+
+// Expected output: 10 20 30 40
+10 20 30 40
+
+// Float promotion: one float makes the whole vector float
+// Expected output: 1 2.5 3
+1 2.5 3
+
+// Expected output: 1 2 3f
+1 2 3f
+
+// Expected output: 1.5 2
+1.5 2
+
+// Boolean vectors
+// Expected output: 101b
+101b
+
+// A single boolean is an atom
+// Expected output: 1b
+1b
+
+// Symbols: an atom, the null symbol and a vector
+// Expected output: `apple
+`apple
+
+// Expected output: `
+`
+
+// Expected output: `a`b`c
+`a`b`c
+
+// Strings are character vectors
+// Expected output: "hello"
+"hello"
+
+// Expected output: ""
+""
+
+// One character in quotes is an atom
+// Expected output: "a"
+"a"
+
+// The negative-literal trap
+// Expected output: 2 -1
+2 -1
+
+// Expected output: 1
+2 - 1
+
+// Expected output: 1
+2-1
+
+// Expected output: 1 -2 3
+1 -2 3
+
+// Expected output: -1 2 3
+-1 2 3
+
+// Variables hold vectors
+// Expected output: 1 2 3
+v:1 2 3
+
+// Expected output: 1 2 3
+v
+
+// Expected output: 10 20
+a:b:10 20
+
+// Expected output: 10 20
+b
+
+// Expected output: "Alice"
+name:"Alice"
+
+// Expected output: `red`green
+tags:`red`green
+
+// Parentheses and trailing comments
+// Expected output: 1 2 3
+(1 2 3)
+
+// Expected output: 4 5 6
+4 5 6 / a comment
+
+// Nulls inside vectors
+// Expected output: 1 0N 3
+1 0N 3
+
+// Expected output: 1 0n
+1 0n
+
+// Expected output: 1 0w
+1 0w
+
+// The integer null becomes the float null when the vector is promoted
+// Expected output: 0n 0n
+0N 0n
+
+// Expected output: 0n 1.5
+0N 1.5

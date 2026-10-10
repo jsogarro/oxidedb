@@ -72,7 +72,8 @@ Phase 1 of the O language implementation is **complete** with a fully functional
 - ✅ **Complete O Language Parser**: Lexer, parser, and AST generation for O syntax
 - ✅ **Right-to-Left Evaluation**: Proper Q-style expression evaluation (e.g., `1 + 2 * 3` = `7`)
 - ✅ **Variable System**: Assignment (`x:5`) and retrieval, held in memory for the session
-- ✅ **Atom Types**: Integers, floats, booleans and characters with q-style type codes
+- ✅ **Atom Types**: Integers, floats, booleans, characters and symbols with q-style type codes
+- ✅ **Vector Literals**: long, float, boolean, symbol and character vectors (strings)
 - ✅ **Interactive REPL**: Full-featured environment with command history and error handling
 - ✅ **File Execution**: Run .o script files with line-by-line execution and error reporting
 - ✅ **Testing**: integration and property tests, plus tests that run every example in the book
@@ -87,8 +88,9 @@ Phase 1 of the O language implementation is **complete** with a fully functional
 - ✅ Variable assignment and retrieval (`:` operator)
 - ✅ Interactive REPL with file execution support
 
-#### Phase 2: Vectors and Lists (book Chapter 3)
-- ⏳ Vector creation and manipulation
+#### Phase 2: Vectors and Lists (book Chapter 3) 🚧 **IN PROGRESS**
+- ✅ Vector literals (`1 2 3`, `1 2.5 3`, `101b`, `` `a`b ``, `"abc"`) and symbol atoms
+- ⏳ Vector creation and manipulation (`til`, `count`, take, join)
 - ⏳ Indexing and slicing
 - ⏳ Basic vector operations (arithmetic, comparison)
 - ⏳ Type-preserving operations
@@ -131,6 +133,8 @@ oxidedb> y
 20
 oxidedb> 2.5 + 1.5    // Float arithmetic
 4f
+oxidedb> 1 2.5 3      // A vector literal; one float promotes all
+1 2.5 3
 oxidedb> \\
 Goodbye!
 ```

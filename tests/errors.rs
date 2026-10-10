@@ -32,15 +32,17 @@ fn errors_display_q_style() {
 #[test]
 fn errors_parse_kind() {
     // lexer failures
-    for src in ["1e", "1e999", "-1e999", "_a:1", "é:1", "\"a", "^", "1x0N"] {
+    for src in ["1e", "1e999", "-1e999", "_a:1", "é:1", "\"a", "^"] {
         assert!(matches!(err(src), QError::Parse(_)), "{src}");
     }
     assert_eq!(
         err("1e999"),
         QError::Parse("float out of range: 1e999".into())
     );
+    // a name glued to a number is application, not yet implemented
+    assert_eq!(err("1x0N"), QError::Nyi("application".into()));
     // parser failures
-    for src in ["1 +", "(1", "+1", ")", "1 2", "1 )"] {
+    for src in ["1 +", "(1", "+1", ")", "1 2 )", "1 )"] {
         assert!(matches!(err(src), QError::Parse(_)), "{src}");
     }
     assert_eq!(
@@ -138,13 +140,9 @@ fn errors_token_source_form() {
     }
     // as they appear in messages
     let msgs = [
-        ("2 -1", "'parse: unexpected -1 after expression"),
-        ("0N 0N", "'parse: unexpected 0N after expression"),
-        ("1 2.5", "'parse: unexpected 2.5 after expression"),
-        ("1 1b", "'parse: unexpected 1b after expression"),
-        ("1 x", "'parse: unexpected x after expression"),
-        ("1 \"a\"", "'parse: unexpected \"a\" after expression"),
-        ("1 0w", "'parse: unexpected 0w after expression"),
+        ("1 1b", "'type"),
+        ("1 x", "'nyi: application"),
+        ("1 \"a\"", "'nyi: application"),
         ("1 )", "'parse: unexpected ) after expression"),
         ("1 ]", "'parse: unexpected ] after expression"),
     ];
