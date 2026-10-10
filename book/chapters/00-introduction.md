@@ -12,17 +12,17 @@ O combines the expressiveness of Q with modern language design principles:
 
 - **Concise Syntax**: Express complex operations in few characters
 - **Right-to-Left Evaluation**: Natural mathematical evaluation order  
-- **Array-Oriented**: Built for working with collections of data
+- **Array-Oriented**: Designed for working with collections of data (collections arrive in Chapter 3; so far O handles single values)
 - **Interactive**: Immediate feedback through the REPL
-- **Type Safe**: Leverages Rust's type system for reliability
+- **Strict About Types**: Combinations that make no sense are errors, not silent conversions (for example, `1b + 1`)
 
 ## The OxideDB Environment
 
 OxideDB provides an interactive environment where you can:
 - Execute O expressions immediately
-- Store and manipulate data in memory
-- Define and use variables
-- Build complex data analysis workflows
+- Define variables and reuse their values
+
+Vectors, tables and queries are still to come. Chapter 3 starts on collections.
 
 ## Getting Started
 
@@ -33,7 +33,7 @@ cargo run
 ```
 
 You'll see:
-```
+```text
 OxideDB - A Q-inspired columnar database
 Type 'exit', 'quit', or '\\' to exit
 
@@ -57,9 +57,9 @@ oxidedb> 2 + 3
 
 Before diving in, understand these fundamental concepts:
 
-1. **Atoms**: Individual values (numbers, characters, symbols)
+1. **Atoms**: Individual values (numbers, booleans and characters; symbols come later)
 2. **Right-to-Left Evaluation**: `2 + 3 * 4` equals `14`, not `10`
 3. **Variables**: Store values using `:` (e.g., `x:5`)
-4. **Types**: O is strongly typed with automatic inference
+4. **Types**: O is dynamically typed. The type belongs to the value, not the variable, so `x:5` followed by `x:2.5` is fine
 
 Let's begin your journey into the world of O!

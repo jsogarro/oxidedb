@@ -1,12 +1,10 @@
-use oxidedb::{Interpreter, Lexer, Parser};
+use oxidedb::{Interpreter, Lexer};
 
 fn eval(src: &str) -> anyhow::Result<oxidedb::Atom> {
-    // No statement separator yet: `;`-split lines share one interpreter.
     let mut interp = Interpreter::new();
     let mut last = None;
     for stmt in src.split(';') {
-        let tokens = Lexer::new(stmt).tokenize()?;
-        last = Some(interp.evaluate(Parser::new(tokens).parse()?)?);
+        last = interp.eval_line(stmt)?;
     }
     Ok(last.unwrap())
 }

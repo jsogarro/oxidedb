@@ -1,4 +1,8 @@
 use crate::language::ast::{BinaryOperator, Expr, UnaryOperator};
+use crate::language::{
+    lexer::{Lexer, Token},
+    parser::Parser,
+};
 use crate::types::atom::Atom;
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
@@ -35,6 +39,17 @@ impl Interpreter {
         Self {
             variables: HashMap::new(),
         }
+    }
+
+    /// Lex, parse and evaluate one line. `None` means the line had no tokens
+    /// (e.g. blank or comment-only).
+    pub fn eval_line(&mut self, input: &str) -> Result<Option<Atom>> {
+        let tokens = Lexer::new(input).tokenize()?;
+        if tokens == [Token::Eof] {
+            return Ok(None);
+        }
+        let ast = Parser::new(tokens).parse()?;
+        self.evaluate(ast).map(Some)
     }
 
     pub fn evaluate(&mut self, expr: Expr) -> Result<Atom> {
