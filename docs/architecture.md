@@ -8,14 +8,15 @@ OxideDB is currently a small q-inspired expression interpreter (the **O** langua
 
 - `lexer.rs`: turns a line of text into a `Vec<Token>` ending in `Token::Eof`. Handles integer and float literals, `1b`/`0b` booleans, `"c"` characters, identifiers (variable names), the `0N`/`0n`/`0w` null and infinity literals, and `/` comments (a `/` at line start or after whitespace comments out the rest of the line).
 - `parser.rs`: builds an `Expr` from the tokens.
-- `ast.rs`: `Expr` (atom, symbol, binary op, unary op, assignment) and the `+ - * %` / negate operators.
-- `interpreter.rs`: evaluates an `Expr` against a `HashMap<String, Atom>` of variables. `Interpreter::eval_line` runs the whole pipeline for one line.
+- `ast.rs`: `Expr` (atom, symbol, binary op, unary op, assignment) the negate operator, and `Verb`, the binary verbs `+ - * % = < > <> <= >= # , !`. The parser produces only `+ - * %`; the rest are placeholders that evaluate to `'nyi`.
+- `interpreter.rs`: evaluates an `Expr` against a `HashMap<String, Value>` of variables. `Interpreter::eval_line` runs the whole pipeline for one line.
 
 ### `src/types/`
 
 - `atom.rs`: the scalar `Atom` enum (boolean, long, float, character, symbol, date, time, timestamp, and typed temporal nulls) with q type codes and q-style display.
 - `sym.rs`: interned symbols, a 4-byte handle into a process-global string table. Interned names are never freed.
-- `column.rs`: `Column`, a typed vector (bool, long, float, char, symbol). It exists as a type with its own tests but the language cannot create one yet.
+- `column.rs`: `Column`, a typed vector (bool, long, float, char, symbol). It is reachable through `Value::Vector`, but the language cannot create one yet.
+- `value.rs`: `Value`, the result of evaluation (atom, vector or general list), its equality and display.
 - `display.rs`: q-style `Display` for `Column` (`1 2 3`, `1 2 3f`, `101b`, `` `a`b ``, `"abc"`) and the character escaping shared with `Atom`'s `Display`.
 
 ### `src/repl/` and `src/main.rs`

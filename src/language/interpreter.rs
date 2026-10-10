@@ -82,8 +82,13 @@ impl Interpreter {
                     (Value::Atom(l), Value::Atom(r)) => {
                         self.apply_binary_op(l, &operator, r).map(Value::Atom)
                     }
-                    // ponytail: vector arithmetic arrives with the kernel (#47).
-                    _ => Err(QError::Nyi("vector arithmetic".into())),
+                    // ponytail: vector kernels arrive with #47.
+                    _ => Err(QError::Nyi(match operator {
+                        Verb::Add | Verb::Subtract | Verb::Multiply | Verb::Divide => {
+                            "vector arithmetic".into()
+                        }
+                        _ => operator.symbol().into(),
+                    })),
                 }
             }
             Expr::UnaryOp { operator, operand } => {

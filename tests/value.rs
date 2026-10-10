@@ -193,7 +193,7 @@ fn value_unimplemented_verbs_are_nyi() {
     for (operator, sym) in verbs {
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Atom(Atom::Integer(1))),
-            operator: operator.clone(),
+            operator,
             right: Box::new(Expr::Atom(Atom::Integer(2))),
         };
         assert_eq!(
@@ -228,4 +228,166 @@ fn column_equality_is_per_type() {
         assert_ne!(a, b);
     }
     assert_ne!(Column::Long(vec![]), Column::Float(vec![]));
+}
+
+fn atom_samples() -> Vec<(Atom, Atom)> {
+    use chrono::{NaiveDate, NaiveTime, TimeZone, Utc};
+    let d = |day| NaiveDate::from_ymd_opt(2024, 1, day).unwrap();
+    let t = |s| NaiveTime::from_hms_opt(9, 30, s).unwrap();
+    let ts = |s| Utc.with_ymd_and_hms(2024, 1, 15, 9, 30, s).unwrap();
+    vec![
+        (Atom::Boolean(true), Atom::Boolean(false)),
+        (Atom::Integer(1), Atom::Integer(2)),
+        (Atom::Float(1.5), Atom::Float(2.5)),
+        (Atom::Character('a'), Atom::Character('b')),
+        (Atom::from("a"), Atom::from("b")),
+        (Atom::Date(d(1)), Atom::Date(d(2))),
+        (Atom::Time(t(1)), Atom::Time(t(2))),
+        (Atom::Timestamp(ts(1)), Atom::Timestamp(ts(2))),
+        (Atom::NullDate, Atom::NullDate),
+        (Atom::NullTime, Atom::NullTime),
+        (Atom::NullTimestamp, Atom::NullTimestamp),
+    ]
+}
+
+#[test]
+fn atom_equality_table() {
+    let s = atom_samples();
+    for (i, (a, b)) in s.iter().enumerate() {
+        assert_eq!(a, &a.clone(), "{a:?} reflexive");
+        assert_eq!(b, &b.clone(), "{b:?} reflexive");
+        if !matches!(a, Atom::NullDate | Atom::NullTime | Atom::NullTimestamp) {
+            assert_ne!(a, b, "{a:?} vs {b:?}");
+            assert_ne!(b, a);
+        }
+        for (j, (c, d)) in s.iter().enumerate() {
+            if i != j {
+                assert_ne!(a, c, "{a:?} vs {c:?}");
+                assert_ne!(a, d, "{a:?} vs {d:?}");
+                assert_ne!(b, c, "{b:?} vs {c:?}");
+            }
+        }
+    }
+    let f = Atom::Float;
+    assert_eq!(f(f64::INFINITY), f(f64::INFINITY));
+    assert_ne!(f(f64::INFINITY), f(f64::NEG_INFINITY));
+    assert_ne!(f(f64::NEG_INFINITY), f(f64::INFINITY));
+    assert_eq!(f(f64::NAN), f(f64::NAN));
+    assert_eq!(f(0.0), f(-0.0));
+    assert_ne!(Atom::Integer(1), f(1.0));
+    assert_ne!(f(1.0), Atom::Integer(1));
+    assert_ne!(Atom::Boolean(true), Atom::Integer(1));
+    assert_ne!(Atom::Integer(i64::MIN), f(f64::NAN));
+}
+
+#[test]
+fn column_equality_checks_every_element_and_length() {
+    let s = Sym::intern;
+    let cols = [
+        (
+            Column::Bool(vec![true, true, true]),
+            Column::Bool(vec![true, true, false]),
+        ),
+        (Column::Long(vec![1, 2, 3]), Column::Long(vec![1, 2, 4])),
+        (
+            Column::Float(vec![1.0, 2.0, 3.0]),
+            Column::Float(vec![1.0, 2.0, 4.0]),
+        ),
+        (
+            Column::Char(vec!['a', 'b', 'c']),
+            Column::Char(vec!['a', 'b', 'd']),
+        ),
+        (
+            Column::Sym(vec![s("a"), s("b"), s("c")]),
+            Column::Sym(vec![s("a"), s("b"), s("d")]),
+        ),
+    ];
+    for (a, b) in cols {
+        assert_eq!(a, a.clone());
+        assert_ne!(a, b);
+        assert_ne!(b, a);
+        // Same prefix, different length.
+        let short = Column::from_atoms(&(0..2).map(|i| a.get(i)).collect::<Vec<_>>()).unwrap();
+        assert_ne!(a, short);
+        assert_ne!(short, a);
+    }
+}
+
+#[test]
+fn value_non_atom_assignment_and_sharing() {
+    let mut i = Interpreter::new();
+    let col = Rc::new(Column::Long(vec![1, 2, 3]));
+    i.set("v", Value::Vector(col.clone()));
+    // Assignment returns the vector, and both names read back equal.
+    assert_eq!(i.eval_line("w:v").unwrap(), Some(longs(&[1, 2, 3])));
+    assert_eq!(i.get("w"), i.get("v"));
+    assert_eq!(i.eval_line("a:b:v").unwrap(), Some(longs(&[1, 2, 3])));
+    assert_eq!(i.get("a"), Some(&longs(&[1, 2, 3])));
+    assert_eq!(i.get("b"), Some(&longs(&[1, 2, 3])));
+    // Reading and rebinding share the column instead of copying it.
+    let ptr = |v: Option<&Value>| match v {
+        Some(Value::Vector(c)) => c.clone(),
+        other => panic!("not a vector: {other:?}"),
+    };
+    assert!(Rc::ptr_eq(&ptr(i.get("v")), &col));
+    assert!(Rc::ptr_eq(&ptr(i.get("w")), &col));
+    assert!(Rc::ptr_eq(&ptr(i.get("b")), &col));
+    match i.eval_line("v").unwrap() {
+        Some(Value::Vector(c)) => assert!(Rc::ptr_eq(&c, &col)),
+        other => panic!("{other:?}"),
+    }
+    // set overwrites.
+    i.set("v", int(9));
+    assert_eq!(i.get("v"), Some(&int(9)));
+    assert_eq!(i.eval_line("v+1").unwrap(), Some(int(10)));
+}
+
+#[test]
+fn value_from_items_keeps_every_non_atom_item() {
+    let a = int(1);
+    let v = longs(&[2, 3]);
+    let items = vec![a.clone(), v.clone()];
+    assert_eq!(
+        Value::from_items(items.clone()),
+        Value::List(Rc::new(items))
+    );
+    let items = vec![v.clone()];
+    assert_eq!(
+        Value::from_items(items.clone()),
+        Value::List(Rc::new(items))
+    );
+    let items = vec![v.clone(), a.clone(), v.clone()];
+    match Value::from_items(items) {
+        Value::List(l) => assert_eq!(*l, vec![v.clone(), a, v.clone()]),
+        other => panic!("{other:?}"),
+    }
+    let inner = Value::List(Rc::new(vec![int(1), v.clone()]));
+    let items = vec![inner.clone(), int(5)];
+    match Value::from_items(items) {
+        Value::List(l) => assert_eq!(*l, vec![inner, int(5)]),
+        other => panic!("{other:?}"),
+    }
+}
+
+#[test]
+fn value_new_verbs_on_any_operand_are_nyi_by_verb() {
+    let mut i = Interpreter::new();
+    i.set("v", longs(&[1, 2]));
+    for (l, r) in [
+        (Atom::Boolean(true), Atom::Boolean(false)),
+        (Atom::Character('a'), Atom::Character('b')),
+    ] {
+        let e = Expr::BinaryOp {
+            left: Box::new(Expr::Atom(l)),
+            operator: Verb::Equal,
+            right: Box::new(Expr::Atom(r)),
+        };
+        assert_eq!(i.evaluate(e), Err(QError::Nyi("=".into())));
+    }
+    let e = Expr::BinaryOp {
+        left: Box::new(Expr::Symbol("v".into())),
+        operator: Verb::Take,
+        right: Box::new(Expr::Atom(Atom::Integer(1))),
+    };
+    assert_eq!(i.evaluate(e), Err(QError::Nyi("#".into())));
 }

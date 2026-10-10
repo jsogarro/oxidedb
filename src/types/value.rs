@@ -46,10 +46,12 @@ impl PartialEq for Value {
             (Value::Atom(a), Value::Atom(b)) => a == b,
             (Value::Vector(a), Value::Vector(b)) => a == b,
             (Value::List(a), Value::List(b)) => a == b,
-            _ => false,
+            (Value::Atom(_) | Value::Vector(_) | Value::List(_), _) => false,
         }
     }
 }
+
+impl Eq for Value {}
 
 impl PartialEq<Atom> for Value {
     fn eq(&self, other: &Atom) -> bool {
@@ -60,12 +62,6 @@ impl PartialEq<Atom> for Value {
 impl PartialEq<Value> for Atom {
     fn eq(&self, other: &Value) -> bool {
         other == self
-    }
-}
-
-impl From<Atom> for Value {
-    fn from(a: Atom) -> Value {
-        Value::Atom(a)
     }
 }
 

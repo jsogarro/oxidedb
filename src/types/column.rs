@@ -22,10 +22,19 @@ impl PartialEq for Column {
             }
             (Column::Char(a), Column::Char(b)) => a == b,
             (Column::Sym(a), Column::Sym(b)) => a == b,
-            _ => false,
+            (
+                Column::Bool(_)
+                | Column::Long(_)
+                | Column::Float(_)
+                | Column::Char(_)
+                | Column::Sym(_),
+                _,
+            ) => false,
         }
     }
 }
+
+impl Eq for Column {}
 
 impl Column {
     /// q list type code (positive).

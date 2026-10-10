@@ -45,10 +45,17 @@ impl PartialEq for Atom {
             (Timestamp(a), Timestamp(b)) => a == b,
             (Symbol(a), Symbol(b)) => a == b,
             (NullDate, NullDate) | (NullTime, NullTime) | (NullTimestamp, NullTimestamp) => true,
-            _ => false,
+            // Exhaustive on the left operand, so a new variant must be decided here.
+            (
+                Boolean(_) | Integer(_) | Float(_) | Character(_) | Date(_) | Time(_)
+                | Timestamp(_) | Symbol(_) | NullDate | NullTime | NullTimestamp,
+                _,
+            ) => false,
         }
     }
 }
+
+impl Eq for Atom {}
 
 impl Atom {
     pub fn type_code(&self) -> i8 {
