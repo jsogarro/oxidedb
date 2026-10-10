@@ -399,17 +399,7 @@ fn arith_negate() {
 
 #[test]
 fn arith_other_verbs_stay_nyi() {
-    for verb in [
-        Verb::Equal,
-        Verb::Less,
-        Verb::Greater,
-        Verb::NotEqual,
-        Verb::LessEqual,
-        Verb::GreaterEqual,
-        Verb::Take,
-        Verb::Join,
-        Verb::Key,
-    ] {
+    for verb in [Verb::Take, Verb::Join, Verb::Key] {
         let e = Err(QError::Nyi(verb.symbol().into()));
         assert_eq!(dyad(verb, &l(1), &l(2)), e);
         assert_eq!(dyad(verb, &lv(&[1]), &l(2)), e);

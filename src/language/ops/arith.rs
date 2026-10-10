@@ -1,6 +1,7 @@
 //! `+ - * %` over atoms, vectors and general lists, atomic as in q.
 //! Bool promotes to long; long with float is float; `%` is always float.
 
+use super::{atomic, Flat};
 use crate::error::{QError, QResult};
 use crate::language::ast::Verb;
 use crate::types::atom::Atom;
@@ -166,42 +167,22 @@ fn scalar(a: &Atom) -> QResult<Scalar> {
     }
 }
 
-fn elements(c: &Column) -> Vec<Value> {
-    (0..c.len()).map(|i| Value::Atom(c.get(i))).collect()
-}
-
-/// General path: item against item, renormalised through `from_items`.
-fn pairwise(verb: Verb, l: &[Value], r: &[Value]) -> QResult<Value> {
-    if l.len() != r.len() {
-        return Err(QError::Length);
-    }
-    let out = l.iter().zip(r).map(|(x, y)| dyad(verb, x, y));
-    out.collect::<QResult<_>>().map(Value::from_items)
-}
-
 pub fn dyad(verb: Verb, left: &Value, right: &Value) -> QResult<Value> {
+    atomic(verb, left, right, flat)
+}
+
+fn flat(verb: Verb, left: Flat, right: Flat) -> QResult<Value> {
     match (left, right) {
-        (Value::Atom(a), Value::Atom(b)) => atom_op(verb, a, b).map(Value::Atom),
-        (Value::Vector(c), Value::Atom(b)) => {
+        (Flat::Atom(a), Flat::Atom(b)) => atom_op(verb, a, b).map(Value::Atom),
+        (Flat::Col(c), Flat::Atom(b)) => {
             column_op(verb, &num_column(c)?, false, &num_atom(b)?, true).map(column_value)
         }
-        (Value::Atom(a), Value::Vector(c)) => {
+        (Flat::Atom(a), Flat::Col(c)) => {
             column_op(verb, &num_atom(a)?, true, &num_column(c)?, false).map(column_value)
         }
-        (Value::Vector(c), Value::Vector(d)) => {
+        (Flat::Col(c), Flat::Col(d)) => {
             column_op(verb, &num_column(c)?, false, &num_column(d)?, false).map(column_value)
         }
-        (Value::List(l), Value::Atom(_)) => {
-            let out = l.iter().map(|x| dyad(verb, x, right));
-            out.collect::<QResult<_>>().map(Value::from_items)
-        }
-        (Value::Atom(_), Value::List(r)) => {
-            let out = r.iter().map(|y| dyad(verb, left, y));
-            out.collect::<QResult<_>>().map(Value::from_items)
-        }
-        (Value::List(l), Value::List(r)) => pairwise(verb, l, r),
-        (Value::List(l), Value::Vector(c)) => pairwise(verb, l, &elements(c)),
-        (Value::Vector(c), Value::List(r)) => pairwise(verb, &elements(c), r),
     }
 }
 
