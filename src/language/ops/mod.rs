@@ -3,6 +3,8 @@
 
 mod arith;
 mod compare;
+mod join;
+mod take;
 
 use crate::error::{QError, QResult};
 use crate::language::ast::Verb;
@@ -22,6 +24,8 @@ pub fn dyad(verb: Verb, left: &Value, right: &Value) -> QResult<Value> {
         | Verb::LessEqual
         | Verb::Greater
         | Verb::GreaterEqual => compare::dyad(verb, left, right),
+        Verb::Take => take::dyad(left, right),
+        Verb::Join => join::dyad(left, right),
         _ => Err(QError::Nyi(verb.symbol().into())),
     }
 }
@@ -68,6 +72,8 @@ pub(super) fn atomic(verb: Verb, left: &Value, right: &Value, leaf: Leaf) -> QRe
         (Value::Atom(a), Value::Atom(b)) => leaf(verb, Flat::Atom(a), Flat::Atom(b)),
         (Value::Atom(a), Value::Vector(c)) => leaf(verb, Flat::Atom(a), Flat::Col(c)),
         (Value::Vector(c), Value::Atom(b)) => leaf(verb, Flat::Col(c), Flat::Atom(b)),
+        // q checks lengths before element types
+        (Value::Vector(c), Value::Vector(d)) if c.len() != d.len() => Err(QError::Length),
         (Value::Vector(c), Value::Vector(d)) => leaf(verb, Flat::Col(c), Flat::Col(d)),
         (Value::List(l), Value::List(r)) => pairwise(verb, l, r, leaf),
         (Value::List(l), Value::Vector(c)) => pairwise(verb, l, &elements(c), leaf),
