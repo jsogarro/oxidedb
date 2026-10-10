@@ -1,13 +1,15 @@
-use crate::error::QResult;
+use crate::error::{QError, QResult};
 use crate::language::interpreter::Interpreter;
 use anyhow::{Context, Result};
 use rustyline::{error::ReadlineError, DefaultEditor};
 use std::io::IsTerminal;
 use std::{ffi::OsString, fs, path::PathBuf};
 
-/// The `\\` command ends a session (interactive or script).
+/// The `\\` command ends a session (interactive or script): `\\` alone or followed by
+/// whitespace and anything (as in q). Glued text (`\\ls`) is a q system command instead.
 fn is_exit_line(line: &str) -> bool {
-    line == "\\\\"
+    line.strip_prefix("\\\\")
+        .is_some_and(|rest| rest.is_empty() || rest.starts_with(char::is_whitespace))
 }
 
 pub struct Repl {
@@ -37,12 +39,13 @@ impl Repl {
         Self::history_path_from(std::env::var_os("HOME"), std::env::var_os("USERPROFILE"))
     }
 
-    /// `$HOME`, else `%USERPROFILE%` (Windows), plus `.oxidedb_history`.
+    /// `$HOME`, else `%USERPROFILE%` (Windows); empty values count as unset,, plus `.oxidedb_history`.
     pub fn history_path_from(
         home: Option<OsString>,
         userprofile: Option<OsString>,
     ) -> Option<PathBuf> {
-        home.or(userprofile)
+        home.filter(|h| !h.is_empty())
+            .or(userprofile.filter(|u| !u.is_empty()))
             .map(|h| PathBuf::from(h).join(".oxidedb_history"))
     }
 
@@ -134,6 +137,9 @@ impl Repl {
 
     /// Evaluates one line; `None` for input with no tokens (e.g. a comment).
     pub fn eval_line(&mut self, input: &str) -> QResult<Option<String>> {
+        if input.starts_with("\\\\") {
+            return Err(QError::Nyi("system command".into()));
+        }
         Ok(self.interpreter.eval_line(input)?.map(|v| v.to_string()))
     }
 }

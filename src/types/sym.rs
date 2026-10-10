@@ -16,6 +16,8 @@ struct Interner {
 /// Index -> name (from 1; the null symbol is special-cased), append-only and read without a lock. Segment `k` holds the `2^k` names whose
 /// `index + 1` has its top bit at `k` (33 segments cover every `u32` handle); a name is written once, before the `Sym` that points at it
 /// escapes, so `as_str` is two atomic loads.
+// ponytail: a segment is allocated whole (2^k slots) the first time it is needed, so the table can
+// hold up to twice the symbols in use; fine below millions of symbols.
 type Segment = Box<[OnceLock<&'static str>]>;
 static NAMES: [OnceLock<Segment>; 33] = [const { OnceLock::new() }; 33];
 
@@ -120,5 +122,48 @@ mod tests {
             assert_eq!(Sym::intern(syms.as_str()), syms);
             assert!(syms.as_str().starts_with("conc"));
         }
+    }
+
+    #[test]
+    fn readers_race_writers() {
+        use std::sync::{mpsc, Arc, Mutex};
+        let (tx, rx) = mpsc::channel::<(Sym, String)>();
+        let rx = Arc::new(Mutex::new(rx));
+        let writers: Vec<_> = (0..4)
+            .map(|t| {
+                let tx = tx.clone();
+                std::thread::spawn(move || {
+                    for i in 0..2000 {
+                        let name = format!("race{t}_{i}");
+                        let sym = Sym::intern(&name);
+                        tx.send((sym, name)).unwrap();
+                    }
+                })
+            })
+            .collect();
+        drop(tx);
+        let readers: Vec<_> = (0..4)
+            .map(|_| {
+                let rx = Arc::clone(&rx);
+                std::thread::spawn(move || {
+                    let mut seen = 0;
+                    loop {
+                        let msg = rx.lock().unwrap().recv();
+                        let Ok((sym, name)) = msg else { break };
+                        // read while the writers are still interning
+                        assert_eq!(sym.as_str(), name);
+                        assert_eq!(sym.to_string(), format!("`{name}"));
+                        assert_eq!(Sym::intern(&name), sym);
+                        seen += 1;
+                    }
+                    seen
+                })
+            })
+            .collect();
+        for w in writers {
+            w.join().unwrap();
+        }
+        let total: usize = readers.into_iter().map(|r| r.join().unwrap()).sum();
+        assert_eq!(total, 8000);
     }
 }
