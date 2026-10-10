@@ -22,15 +22,16 @@ cargo run -- book/examples/filename.o
 ## File Format
 
 Each .o file contains:
-- Comments explaining the concepts (lines starting with `//`)
+- Comments explaining the concepts (`/` at the start of a line or after whitespace comments out the rest of the line, so `//` works too and trailing comments are allowed; a `/` glued to the previous token is the over adverb)
 - O expressions to execute
 - Expected output documented in comments above each expression
 
 The O interpreter will:
-- Skip comment lines and empty lines
+- Skip comment-only and empty lines
 - Execute each O expression line by line
 - Display the result of each expression
-- Stop execution if an error occurs
+- Stop at the first error: it is reported once on stderr (with the line number) and the exit status is 1
+- Write the banner to stderr, so stdout contains only results (and a leading UTF-8 BOM is ignored)
 
 ## Example Output
 
