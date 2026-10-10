@@ -517,7 +517,113 @@ oxidedb> v[0;1]
 oxidedb> v[]
 10 20 30
 ```
-Assigning to an item (`v[0]:5`) is not supported yet.
+
+## Changing items
+
+An index on the left of a colon replaces those items. The statement's value is what the index reads afterwards, so `5` here, and the vector itself has changed:
+```
+oxidedb> d:10 20 30
+10 20 30
+oxidedb> d[0]:5
+5
+oxidedb> d
+5 20 30
+```
+Several items change at once with a vector of indexes. A vector of values goes in pairwise, and a single value is used for every index:
+```
+oxidedb> d[0 2]:7 8
+7 8
+oxidedb> d
+7 20 8
+oxidedb> d[1 2]:0
+0 0
+oxidedb> d
+7 0 0
+```
+If an index is repeated, the last value wins, and the statement's value is read back from the vector, so it shows the winner twice:
+```
+oxidedb> d[0 0]:1 2
+2 2
+oxidedb> d
+2 0 0
+```
+The copy stays unchanged. Giving a vector a second name does not copy it until one of the two is changed, and then only the one you changed is different:
+```
+oxidedb> e:d
+2 0 0
+oxidedb> d[0]:99
+99
+oxidedb> d
+99 0 0
+oxidedb> e
+2 0 0
+```
+An assignment is an expression like any other and takes everything on its right, so it can sit inside a bigger one. The value is evaluated first and then the index, right to left:
+```
+oxidedb> 1+d[0 1]:5 6
+6 7
+oxidedb> d
+5 6 0
+```
+Strings are vectors of characters, so they change in the same way:
+```
+oxidedb> t:"abc"
+"abc"
+oxidedb> t[0]:"x"
+"x"
+oxidedb> t
+"xbc"
+```
+
+### The type must match
+
+A vector has one type, and the new item must have exactly that type. O never converts it for you: a float does not fit in a long vector, a long does not fit in a float vector, and a boolean is not a long. Any of these is a `'type` error, and the vector is left as it was:
+```
+oxidedb> d[0]:1.5
+'type
+oxidedb> d[1]:`a
+'type
+oxidedb> f:1.5 2.5
+1.5 2.5
+oxidedb> f[0]:1
+'type
+oxidedb> d
+5 6 0
+```
+A null of the right type is fine (`d[0]:0N`). Only a general list takes items of any type.
+
+### Out of range is an error
+
+Reading past the end gives a null, but assigning past the end is an error, because the vector cannot grow this way. The error is `'length` (not `'index`; q has no such error). A negative index and the null `0N` are out of range too. If any index is out of range nothing is changed. The count of values must match the count of indexes as well:
+```
+oxidedb> d[5]
+0N
+oxidedb> d[5]:1
+'length
+oxidedb> d[-1]:1
+'length
+oxidedb> d[0 1]:1 2 3
+'length
+oxidedb> d
+5 6 0
+```
+So a read is forgiving and a write is strict. To make a vector longer, join to it (`d,7`) and bind the result.
+
+### What can be assigned to
+
+Only a name can have its items changed. The name must hold a vector or a list: an atom is a `'type` error, and a name with no value is a `'length` error (q treats a name it does not know as an empty list, so every index is out of range). Changing an item of an item (`d[0][1]:5`), several indexes in one bracket and the combined forms such as `d[0]+:1` are not supported yet:
+```
+oxidedb> y:5
+5
+oxidedb> y[0]:1
+'type
+oxidedb> nothing[0]:1
+'length
+oxidedb> d[0][1]:2
+'nyi: depth assignment
+oxidedb> d[0]+:1
+'nyi: compound assignment
+```
 
 ## Take (`#`)
 
@@ -616,7 +722,7 @@ oxidedb> (1 2,3) = 1 2 4
 
 ## Unfinished Business
 
-Two things that look like they should work are not supported yet. Each gives a clear error rather than a wrong answer.
+Some things that look like they should work are not supported yet. Each gives a clear error rather than a wrong answer.
 
 General lists, written with parentheses and semicolons, are not built yet:
 ```
@@ -628,13 +734,14 @@ Adverbs such as over are also still to come:
 oxidedb> 1 2 3/2
 'nyi: adverb '/'
 ```
+Changing an item of an item, and the combined forms of assignment, are the last gaps in changing items (see above).
 
 ## Coming Next
 
 These parts of the chapter will be added as the features arrive. None of them work yet, so there are no samples for them:
 
 - general (mixed or nested) lists, written with parentheses and semicolons
-- assigning to an item of a vector (`v[0]:5`)
+- changing an item of an item (`d[0][1]:5`) and the combined forms (`d[0]+:1`)
 - several statements on one line, separated by `;`
 - adverbs and functions
 
@@ -658,6 +765,8 @@ These parts of the chapter will be added as the features arrive. None of them wo
 16. Make the vector `7 7 7 7` without typing four sevens, and a six-item vector `1 2 1 2 1 2` from `1 2`.
 17. Predict `(0.2+0.1) = 0.3` and `(0.5+0.5) = 1.0`. Which one is true, and why?
 18. Is `(1,2) , 3.5` a float vector? Predict, then run it.
+19. With `a:1 2 3 4 5`, change the middle item to 0 and the first and last to 9 in two statements. Print `a`.
+20. Predict `b:a`, then `a[0]:7`: what are `a` and `b`? Predict `a[5]:1`, `a[0]:1.5` and `a[5]` before you run them, and say which two are errors and why the third is not.
 
 ## Key Takeaways
 
@@ -675,4 +784,5 @@ These parts of the chapter will be added as the features arrive. None of them wo
 - `neg` negates, as O's leading minus does
 - `+ - * %` work item by item on vectors: an atom is paired with every item, two vectors pair up if they have the same length (`'length` otherwise), `%` gives floats, and symbols and strings are `'type`
 - `n#v` takes the first `n` items (wrapping; negative from the end; an atom repeats); `x,y` joins and never converts types, so `1,2.5` is a general list
-- General lists, item assignment, `;` statements, adverbs and functions are still to come
+- `v[i]:x` replaces items in place (`v[0 2]:7 8` pairwise, `v[0 2]:9` for every index, the last of a repeated index wins) and a copy made with another name is not changed; the value must have the vector's exact type (`'type`, never converted) and an out-of-range index is `'length` where a read gives a null
+- General lists, changing an item of an item, `;` statements, adverbs and functions are still to come

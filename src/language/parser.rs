@@ -186,9 +186,9 @@ impl Parser {
         let mut joins = Vec::new();
         loop {
             let mut operand = self.unary()?;
-            // `v[0]:5`, wherever it stands in the chain.
-            if matches!(operand, Expr::Apply { .. }) && self.check(&Token::Colon) {
-                return Err(QError::Nyi("index assignment".into()));
+            // `v[0]:5`, wherever it stands in the chain; it takes the rest of the input.
+            if matches!(operand, Expr::Apply { .. }) && self.match_tokens(&[Token::Colon]) {
+                operand = self.index_assignment(operand)?;
             }
             // An assignment in operand position (`x+y:2`) takes the rest of the input.
             if let (false, Expr::Symbol(name)) = (operands.is_empty(), &operand) {
@@ -207,6 +207,10 @@ impl Parser {
             // Both fold from the right, so `v 0 + 1` is `v (0 + 1)`.
             let join = if let Some(verb) = verb_of(self.peek()) {
                 self.advance();
+                // `v[0]+:1`, `x+:1`
+                if self.check(&Token::Colon) {
+                    return Err(QError::Nyi("compound assignment".into()));
+                }
                 Join::Verb(verb)
             } else if starts_noun(self.peek()) {
                 Join::Apply
@@ -233,6 +237,25 @@ impl Parser {
             };
         }
         Ok(right)
+    }
+
+    /// The `v[i]` already parsed, its `:` read; only a plain name with one index is built.
+    fn index_assignment(&mut self, target: Expr) -> QResult<Expr> {
+        match target {
+            Expr::Apply { func, mut args } if args.len() == 1 => match *func {
+                Expr::Symbol(name) => {
+                    assignable(&name)?;
+                    let value = self.expression()?;
+                    Ok(Expr::IndexAssignment {
+                        name,
+                        index: Box::new(args.remove(0)),
+                        value: Box::new(value),
+                    })
+                }
+                _ => Err(QError::Nyi("depth assignment".into())),
+            },
+            _ => Err(QError::Nyi("depth assignment".into())),
+        }
     }
 
     fn unary(&mut self) -> QResult<Expr> {

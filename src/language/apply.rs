@@ -65,3 +65,84 @@ fn index(f: &Value, i: &Value) -> QResult<Value> {
         }
     }
 }
+
+/// `target[idx]:val`, in place (copy-on-write when the vector is shared). Checked in q's order,
+/// and nothing changes on an error: the index must be long or boolean (`'type`), every position
+/// in range (`'length`, where a read gives a null), the value's count must fit (`'length`),
+/// and for a vector its type must match exactly (`'type`: no promotion). An atom cannot be
+/// amended. A general list takes any value; one that ends up with all items of one atom type
+/// collapses to a vector, as in q.
+pub fn amend(target: &mut Value, idx: &Value, val: &Value) -> QResult<()> {
+    let len = match target {
+        Value::Atom(_) => return Err(QError::Type),
+        Value::Vector(c) => c.len(),
+        Value::List(items) => items.len(),
+    };
+    let (positions, scalar) = match idx {
+        Value::Atom(a) => (vec![position(a)?], true),
+        Value::Vector(c) => match &**c {
+            Column::Long(v) => (v.clone(), false),
+            Column::Bool(v) => (v.iter().map(|&b| i64::from(b)).collect(), false),
+            _ => return Err(QError::Type),
+        },
+        // the empty general list is an empty index
+        Value::List(items) if items.is_empty() => return Ok(()),
+        Value::List(_) => return Err(QError::Type),
+    };
+    let pos = positions
+        .iter()
+        .map(|&p| usize::try_from(p).ok().filter(|&p| p < len))
+        .collect::<Option<Vec<usize>>>()
+        .ok_or(QError::Length)?;
+    // One item per position, or a single item broadcast.
+    let count_fits = |n: usize| scalar || n == pos.len();
+    match target {
+        Value::Vector(col) => {
+            let src = match val {
+                Value::Atom(a) => {
+                    Column::from_atoms(std::slice::from_ref(a)).ok_or(QError::Type)?
+                }
+                _ if scalar => return Err(QError::Type),
+                Value::Vector(c) if count_fits(c.len()) => (**c).clone(),
+                Value::List(items) if count_fits(items.len()) => {
+                    let atoms: Option<Vec<Atom>> = items
+                        .iter()
+                        .map(|x| match x {
+                            Value::Atom(a) => Some(a.clone()),
+                            _ => None,
+                        })
+                        .collect();
+                    atoms
+                        .as_deref()
+                        .and_then(Column::from_atoms)
+                        .ok_or(QError::Type)?
+                }
+                _ => return Err(QError::Length),
+            };
+            Rc::make_mut(col).assign(&pos, &src)
+        }
+        Value::List(items) => {
+            let new: Vec<Value> = match val {
+                Value::Atom(_) => vec![val.clone()],
+                _ if scalar => vec![val.clone()],
+                Value::Vector(c) if count_fits(c.len()) => {
+                    (0..c.len()).map(|k| Value::Atom(c.get(k))).collect()
+                }
+                Value::List(l) if count_fits(l.len()) => l.to_vec(),
+                _ => return Err(QError::Length),
+            };
+            let list = Rc::make_mut(items);
+            for (k, &p) in pos.iter().enumerate() {
+                list[p] = if new.len() == 1 {
+                    new[0].clone()
+                } else {
+                    new[k].clone()
+                };
+            }
+            let all = std::mem::take(list);
+            *target = Value::from_items(all);
+            Ok(())
+        }
+        Value::Atom(_) => unreachable!("atoms are rejected above"),
+    }
+}

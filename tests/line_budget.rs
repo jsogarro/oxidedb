@@ -192,6 +192,38 @@ fn application_and_bracket_links_spend_from_the_budget() {
     .contains("nested too deeply"));
 }
 
+/// `v[0]:` + a `k`-operator chain, and the chain inside the index instead. `v` is unbound, so a
+/// line that parses ends in the evaluation error `'length`.
+#[test]
+fn index_assignment_spends_from_the_budget() {
+    let parses = |src: String| assert_eq!(run_child(&src, 8192), Err("'length".to_string()));
+    // the line spends 1, the bracket link 1, the index 1, the value 1, each operator 1
+    let value = |k: usize| format!("v[0]:{}1", "1+".repeat(k));
+    parses(value(1996));
+    assert!(run_child(&value(1997), 8192)
+        .unwrap_err()
+        .contains("too long"));
+    let index = |k: usize| format!("v[{}1]:5", "1+".repeat(k));
+    parses(index(1996));
+    assert!(run_child(&index(1997), 8192)
+        .unwrap_err()
+        .contains("too long"));
+    // chained assignments share the budget with everything else on the line
+    let chained = |n: usize| format!("{}1", "v[0]:".repeat(n));
+    parses(chained(100));
+    // nested 127 levels deep, each opened after a long chain
+    assert_rejected(&format!(
+        "{}1",
+        ("v[0]:".to_string() + &"1+".repeat(217)).repeat(127)
+    ));
+    let level = "1+".repeat(217) + "v[";
+    assert_rejected(&format!("{}0{}", level.repeat(127), "]:1".repeat(127)));
+    // the nesting cap holds for a chain of index assignments too
+    assert!(run_child(&chained(130), 8192)
+        .unwrap_err()
+        .contains("nested too deeply"));
+}
+
 #[test]
 fn leading_minus_variant_is_rejected() {
     for (levels, terms) in [(127, 217), (32, 858)] {

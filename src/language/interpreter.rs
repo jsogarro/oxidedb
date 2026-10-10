@@ -78,7 +78,28 @@ impl Interpreter {
                 self.variables.insert(name, val.clone());
                 Ok(val)
             }
+            Expr::IndexAssignment { name, index, value } => {
+                self.evaluate_index_assignment(&name, *index, *value)
+            }
         }
+    }
+
+    /// `name[index]:value`. Out of line like `evaluate_apply`. The value is evaluated first,
+    /// then the index, as q does; only then is the name read.
+    #[inline(never)]
+    fn evaluate_index_assignment(
+        &mut self,
+        name: &str,
+        index: Expr,
+        value: Expr,
+    ) -> QResult<Value> {
+        let value = self.evaluate(value)?;
+        let index = self.evaluate(index)?;
+        // q reads an undefined name as an empty list, so every index is out of range.
+        let target = self.variables.get_mut(name).ok_or(QError::Length)?;
+        apply::amend(target, &index, &value)?;
+        // The statement's value is what the index now reads (duplicates: the last one won).
+        apply::apply(target, &[index])
     }
 
     /// Kept out of line so `evaluate`'s own stack frame, which every nesting level pays for,

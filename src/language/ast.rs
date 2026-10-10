@@ -23,6 +23,12 @@ pub enum Expr {
         name: String,
         value: Box<Expr>,
     },
+    /// `name[index]:value`: the target is always a plain name.
+    IndexAssignment {
+        name: String,
+        index: Box<Expr>,
+        value: Box<Expr>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

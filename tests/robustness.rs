@@ -11,7 +11,7 @@ fn operand() -> impl Strategy<Value = String> {
             "-9223372036854775808", "1b", "0b", "-1", "0N", "0n", "0w", "-0w", "1e3", "1e-3", "1f",
             "0W", "1e", "1F", "1 2 3", "1 2.5 3", "1 -2", "0N 0n", "1 0N", "101b", "`a`b",
             "til 3", "count til 4", "neg 1 2", "1 2 3[1]", "(1 2 3)[0 5]", "til[2]", "count[1;2]",
-            "1 2 3 1", "\"abc\" 0 7", "neg 0N", "til -1", "til 0N", "`a",
+            "1 2 3 1", "\"abc\" 0 7", "x[0]:1", "x[1 9]:2", "(x)[0]:x[1]:5", "x[0]+:1", "x[0][0]:1", "neg 0N", "til -1", "til 0N", "`a",
             "\"abc\"", "1 1b", "1 \"a\"", "1f 2", "1 2 3f", "1 2 + 3 4",
         ][..]).prop_map(String::from),
         2 => prop::sample::select(&["a", "é", "_", "x1", "日本"][..]).prop_map(String::from),
@@ -141,7 +141,8 @@ proptest! {
 
 const APPLY: &[&str] = &[
     "til", "count", "neg", "x", "v", "1", "0", "-1", "1 2", "0N", "`a", "\"ab\"", "101b", "3.5",
-    "(", ")", "[", "]", ";", "+", "-", "=", ",", ":", "x:", "v:1 2 3",
+    "(", ")", "[", "]", ";", "+", "-", "=", ",", ":", "x:", "v:1 2 3", "v[0]:", "v[0 1]:", "v[9]:",
+    "v[-1]:", "v[0N]:", "v[101b]:", "x[0]:", "w[0]:", "v[0]+:",
 ];
 
 proptest! {
@@ -164,6 +165,69 @@ proptest! {
         let toks: Vec<&str> = v.iter().map(|&i| APPLY[i]).collect();
         if let Ok(Some(value)) = interp.eval_line(&toks.join(" ")) {
             let _ = value.to_string();
+        }
+    }
+}
+
+const AMEND: &[&str] = &[
+    "v[0]:5",
+    "v[2]:5",
+    "v[3]:5",
+    "v[0N]:5",
+    "v[0 2]:7 8",
+    "v[0 1 2]:7 8",
+    "v[0 2]:9",
+    "v[1.]:5",
+    "v[0]:1.5",
+    "v[0]:`a",
+    "v[0]:0n",
+    "v[0]:0N",
+    "v[01b]:0 1",
+    "v[0#0]:5",
+    "v[0]:7 8",
+    "l[0]:1b",
+    "l[0 1]:3",
+    "l[1]:2 3",
+    "x[0]:1",
+    "u[0]:1",
+    "v",
+    "l",
+    "w:v",
+    "v[0]:v[1]:3",
+    "v[1]:v:5 6 7",
+    "v[0]+:1",
+    "v[0][0]:2",
+    "count[0]:1",
+    "s[0]:\"x\"",
+    "s[0 1]:\"x\"",
+    "s[0]:`x",
+    "s",
+];
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(1024))]
+
+    // Index assignments in any order, on a session holding every column type: never a panic,
+    // and every binding still prints.
+    #[test]
+    fn index_assignment_sequences_never_panic(v in proptest::collection::vec(0..AMEND.len(), 0..=10)) {
+        let mut interp = Interpreter::new();
+        for setup in ["v:10 20 30", "x:5", "s:\"abc\""] {
+            interp.eval_line(setup).unwrap();
+        }
+        interp.set("l", oxidedb::Value::List(std::rc::Rc::new(vec![
+            oxidedb::Value::Atom(oxidedb::types::atom::Atom::Integer(1)),
+            oxidedb::Value::Atom(oxidedb::types::atom::Atom::Boolean(true)),
+        ])));
+        for &i in &v {
+            if let Ok(Some(value)) = interp.eval_line(AMEND[i]) {
+                let _ = value.to_string();
+            }
+        }
+        for name in ["v", "x", "s", "l", "w"] {
+            if let Some(value) = interp.get(name) {
+                let _ = value.to_string();
+            }
         }
     }
 }
