@@ -24,18 +24,36 @@ pub enum Token {
     Minus,
     Multiply,
     Divide,
+    Equal,
+    Less,
+    Greater,
+    NotEqual,
+    LessEqual,
+    GreaterEqual,
+    Hash,
+    Comma,
+    Bang,
+    Dollar,
+    At,
 
     // Adverbs (lexed; not yet parsed)
     Over,
     Scan,
+    EachPrior,
+    EachRight,
+    EachLeft,
 
     // Punctuation
     LeftParen,
     RightParen,
     LeftBracket,
     RightBracket,
+    LeftBrace,
+    RightBrace,
+    Quote,
     Semicolon,
     Colon,
+    DoubleColon,
 
     // Assignment
     Assignment,
@@ -77,6 +95,24 @@ impl fmt::Display for Token {
             Token::Minus => write!(f, "-"),
             Token::Multiply => write!(f, "*"),
             Token::Divide => write!(f, "%"),
+            Token::Equal => write!(f, "="),
+            Token::Less => write!(f, "<"),
+            Token::Greater => write!(f, ">"),
+            Token::NotEqual => write!(f, "<>"),
+            Token::LessEqual => write!(f, "<="),
+            Token::GreaterEqual => write!(f, ">="),
+            Token::Hash => write!(f, "#"),
+            Token::Comma => write!(f, ","),
+            Token::Bang => write!(f, "!"),
+            Token::Dollar => write!(f, "$"),
+            Token::At => write!(f, "@"),
+            Token::EachPrior => write!(f, "':"),
+            Token::LeftBrace => write!(f, "{{"),
+            Token::RightBrace => write!(f, "}}"),
+            Token::Quote => write!(f, "'"),
+            Token::EachRight => write!(f, "/:"),
+            Token::EachLeft => write!(f, "\\:"),
+            Token::DoubleColon => write!(f, "::"),
             Token::Over => write!(f, "/"),
             Token::Scan => write!(f, "\\"),
             Token::LeftParen => write!(f, "("),
@@ -202,14 +238,22 @@ impl Lexer {
                 }
                 // A comment `/` was already consumed by skip_whitespace, so any
                 // `/` reaching here is glued to the previous token.
-                '/' => {
-                    self.advance();
-                    Ok(Token::Over)
-                }
-                '\\' => {
-                    self.advance();
-                    Ok(Token::Scan)
-                }
+                '/' => self.adverb(Token::Over, Token::EachRight),
+                '\\' => self.adverb(Token::Scan, Token::EachLeft),
+                '=' => self.single(Token::Equal),
+                '<' if self.next_char() == Some('>') => self.pair(Token::NotEqual),
+                '<' if self.next_char() == Some('=') => self.pair(Token::LessEqual),
+                '<' => self.single(Token::Less),
+                '>' if self.next_char() == Some('=') => self.pair(Token::GreaterEqual),
+                '>' => self.single(Token::Greater),
+                '#' => self.single(Token::Hash),
+                ',' => self.single(Token::Comma),
+                '!' => self.single(Token::Bang),
+                '{' => self.single(Token::LeftBrace),
+                '}' => self.single(Token::RightBrace),
+                '$' => self.single(Token::Dollar),
+                '@' => self.single(Token::At),
+                '\'' => self.adverb(Token::Quote, Token::EachPrior),
                 '.' if self.next_is_digit() => self.read_number(),
                 '(' => {
                     self.advance();
@@ -231,10 +275,7 @@ impl Lexer {
                     self.advance();
                     Ok(Token::Semicolon)
                 }
-                ':' => {
-                    self.advance();
-                    Ok(Token::Colon)
-                }
+                ':' => self.adverb(Token::Colon, Token::DoubleColon),
                 '"' => self.read_character(),
                 ch if ch.is_ascii_digit() => self.read_number(),
                 ch if ch.is_ascii_alphabetic() => self.read_identifier(),
@@ -243,6 +284,29 @@ impl Lexer {
                 _ => Err(QError::parse(format!("unexpected character: {ch}"))),
             },
         }
+    }
+
+    fn single(&mut self, token: Token) -> QResult<Token> {
+        self.advance();
+        Ok(token)
+    }
+
+    fn pair(&mut self, token: Token) -> QResult<Token> {
+        self.advance();
+        self.single(token)
+    }
+
+    /// `alone`, or `with_colon` when a `:` follows directly (`/` `/:`).
+    fn adverb(&mut self, alone: Token, with_colon: Token) -> QResult<Token> {
+        if self.next_char() == Some(':') {
+            self.pair(with_colon)
+        } else {
+            self.single(alone)
+        }
+    }
+
+    fn next_char(&self) -> Option<char> {
+        self.input.get(self.position + 1).copied()
     }
 
     fn advance(&mut self) {
@@ -306,7 +370,8 @@ impl Lexer {
                 | Token::Str(_)
                 | Token::BoolList(_)
                 | Token::RightParen
-                | Token::RightBracket,
+                | Token::RightBracket
+                | Token::RightBrace,
             ) => spaced,
             Some(_) => true,
         }

@@ -34,7 +34,7 @@ fn lexer_details_are_lowercase() {
         parse("invalid float: exponent needs digits after 'e'")
     );
     assert_eq!(lex_err("1e999"), parse("float out of range: 1e999"));
-    assert_eq!(lex_err("$"), parse("unexpected character: $"));
+    assert_eq!(lex_err("^"), parse("unexpected character: ^"));
     assert_eq!(lex_err("0Nx"), parse("invalid literal: 0N..."));
 }
 
