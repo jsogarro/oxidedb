@@ -25,8 +25,8 @@ oxidedb> x
 ## Variable Names
 
 Variable names in O follow these rules:
-- Must start with a letter or underscore
-- Can contain letters, numbers, and underscores
+- Must start with a letter
+- Can contain letters, digits, and underscores (ASCII only, so `é` is an error)
 - Are case-sensitive
 
 Valid variable names:
@@ -160,7 +160,7 @@ Error: Undefined variable: undefined_variable
 ## Key Takeaways
 
 - Use `:` for assignment: `variable:value`
-- Variable names are case-sensitive and start with letters/underscores
+- Variable names are case-sensitive and start with a letter
 - Variables can be used in expressions like literal values
 - Right-to-left evaluation applies to expressions with variables
 - Variables persist throughout the REPL session

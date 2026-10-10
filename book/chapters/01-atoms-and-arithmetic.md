@@ -30,6 +30,42 @@ oxidedb> 0.0
 0f
 ```
 
+Scientific notation uses a lowercase `e` followed by an optional sign and digits, and an `f` suffix marks a whole number as a float. The result is always a float:
+```
+oxidedb> 1e3
+1000f
+oxidedb> 1.5e3
+1500f
+oxidedb> 1e-3
+0.001
+oxidedb> 2f
+2f
+```
+A bare `1e` or `1e+` is an error, and so is a literal too large for a float (`1e999`: "Float out of range").
+
+### Nulls and infinities
+`0N` is the long (integer) null, `0n` is the float null, and `0w` and `-0w` are the float infinities. They display exactly as typed:
+```
+oxidedb> 0N
+0N
+oxidedb> 0n
+0n
+oxidedb> 0w
+0w
+oxidedb> -0w
+-0w
+```
+`0N` is an integer and the other three are floats. A null in arithmetic gives a null: a long null with another long gives `0N`, and a long null mixed with a float (or divided with `%`) gives `0n`:
+```
+oxidedb> 0N + 1
+0N
+oxidedb> 0N + 1.5
+0n
+oxidedb> 0N % 2
+0n
+```
+`0N` is stored as the smallest 64-bit integer, so the literal `-9223372036854775808` reads as `0N`. A computation on ordinary numbers that lands on that value is still an overflow error. `0W` (the long infinity) is not supported.
+
 ### Booleans
 True or false values:
 ```

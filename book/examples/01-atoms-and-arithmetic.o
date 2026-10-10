@@ -22,6 +22,45 @@
 // Expected output: 0.5
 .5 / the zero before the dot is optional
 
+// Float exponents and the f suffix
+// Expected output: 1000f
+1e3
+
+// Expected output: 1500f
+1.5e3
+
+// Expected output: 0.001
+1e-3
+
+// Expected output: 2f
+2f
+
+// Nulls and infinities
+// Expected output: 0N
+0N
+
+// Expected output: 0n
+0n
+
+// Expected output: 0w
+0w
+
+// Expected output: -0w
+-0w
+
+// Expected output: 0N
+0N + 1
+
+// Expected output: 0n
+0N + 1.5
+
+// Expected output: 0n
+0N % 2
+
+// The smallest 64-bit integer is the long null
+// Expected output: 0N
+-9223372036854775808
+
 // Boolean Values
 // Expected output: 1b
 1b

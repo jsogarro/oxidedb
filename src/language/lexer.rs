@@ -38,7 +38,12 @@ pub enum Token {
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            Token::Integer(i64::MIN) => write!(f, "0N"),
             Token::Integer(n) => write!(f, "{}", n),
+            Token::Float(n) if n.is_nan() => write!(f, "0n"),
+            Token::Float(n) if n.is_infinite() => {
+                write!(f, "{}0w", if *n < 0.0 { "-" } else { "" })
+            }
             Token::Float(n) => write!(f, "{}", n),
             Token::Boolean(b) => write!(f, "{}", if *b { "1b" } else { "0b" }),
             Token::Character(c) => write!(f, "\"{}\"", c),
@@ -59,6 +64,18 @@ impl fmt::Display for Token {
             Token::Eof => write!(f, "EOF"),
         }
     }
+}
+
+fn bad_identifier_char(ch: char) -> anyhow::Error {
+    if ch == '_' {
+        anyhow!("Invalid identifier: a name must start with a letter, not '_'")
+    } else {
+        anyhow!("Invalid identifier: non-ASCII character '{ch}'; names are ASCII letters, digits and '_'")
+    }
+}
+
+fn is_ident_char(c: char) -> bool {
+    c.is_alphanumeric() || c == '_'
 }
 
 pub struct Lexer {
@@ -155,7 +172,8 @@ impl Lexer {
                 }
                 '"' => self.read_character(),
                 ch if ch.is_ascii_digit() => self.read_number(),
-                ch if ch.is_alphabetic() || ch == '_' => self.read_identifier(),
+                ch if ch.is_ascii_alphabetic() => self.read_identifier(),
+                ch if ch.is_alphanumeric() || ch == '_' => Err(bad_identifier_char(ch)),
                 _ => Err(anyhow!("Unexpected character: {}", ch)),
             },
         }
@@ -182,6 +200,12 @@ impl Lexer {
                 break;
             }
         }
+    }
+
+    fn ident_char_at(&self, offset: usize) -> bool {
+        self.input
+            .get(self.position + offset)
+            .is_some_and(|c| is_ident_char(*c))
     }
 
     fn next_is_digit(&self) -> bool {
@@ -242,19 +266,68 @@ impl Lexer {
 
         if (number == "0" || number == "1")
             && self.current_char == Some('b')
-            && !self
-                .input
-                .get(self.position + 1)
-                .is_some_and(|c| c.is_alphanumeric() || *c == '_')
+            && !self.ident_char_at(1)
         {
             self.advance();
             return Ok(Token::Boolean(number == "1"));
+        }
+
+        // Null and infinity literals: `0N` `0n` `0w` (optionally negative).
+        if number == "0" || number == "-0" {
+            let neg = number.starts_with('-');
+            let literal = match self.current_char {
+                Some('N') => Some(Token::Integer(i64::MIN)),
+                Some('n') => Some(Token::Float(f64::NAN)),
+                Some('w') => Some(Token::Float(if neg {
+                    f64::NEG_INFINITY
+                } else {
+                    f64::INFINITY
+                })),
+                Some('W') => return Err(anyhow!("Long infinity 0W is not supported")),
+                _ => None,
+            };
+            if let Some(token) = literal {
+                if self.ident_char_at(1) {
+                    return Err(anyhow!(
+                        "Invalid literal: {}{}...",
+                        number,
+                        self.current_char.unwrap_or(' ')
+                    ));
+                }
+                self.advance();
+                return Ok(token);
+            }
+        }
+
+        if self.current_char == Some('e') {
+            is_float = true;
+            number.push('e');
+            self.advance();
+            if let Some(sign @ ('+' | '-')) = self.current_char {
+                number.push(sign);
+                self.advance();
+            }
+            if !self.current_char.is_some_and(|c| c.is_ascii_digit()) {
+                return Err(anyhow!("Invalid float: exponent needs digits after 'e'"));
+            }
+            while let Some(ch) = self.current_char.filter(char::is_ascii_digit) {
+                number.push(ch);
+                self.advance();
+            }
+        }
+
+        if self.current_char == Some('f') && !self.ident_char_at(1) {
+            is_float = true;
+            self.advance();
         }
 
         if is_float {
             let value = number
                 .parse::<f64>()
                 .map_err(|_| anyhow!("Invalid float: {}", number))?;
+            if !value.is_finite() {
+                return Err(anyhow!("Float out of range: {}", number));
+            }
             Ok(Token::Float(value))
         } else {
             let value = number
@@ -268,7 +341,7 @@ impl Lexer {
         let mut identifier = String::new();
 
         while let Some(ch) = self.current_char {
-            if ch.is_alphanumeric() || ch == '_' {
+            if ch.is_ascii_alphanumeric() || ch == '_' {
                 identifier.push(ch);
                 self.advance();
             } else {

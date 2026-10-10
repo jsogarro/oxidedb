@@ -11,6 +11,15 @@ fn checked(result: Option<i64>) -> Result<Atom> {
     }
 }
 
+/// Long null is the i64::MIN sentinel; as a float it is NaN.
+fn long_to_float(n: i64) -> f64 {
+    if n == i64::MIN {
+        f64::NAN
+    } else {
+        n as f64
+    }
+}
+
 pub struct Interpreter {
     variables: HashMap<String, Atom>,
 }
@@ -60,6 +69,12 @@ impl Interpreter {
 
     fn apply_binary_op(&self, left: &Atom, op: &BinaryOperator, right: &Atom) -> Result<Atom> {
         match (left, op, right) {
+            // A long null operand yields a long null (`%` is float, handled below).
+            (
+                Atom::Integer(a),
+                BinaryOperator::Add | BinaryOperator::Subtract | BinaryOperator::Multiply,
+                Atom::Integer(b),
+            ) if *a == i64::MIN || *b == i64::MIN => Ok(Atom::Integer(i64::MIN)),
             // Integer arithmetic
             (Atom::Integer(a), BinaryOperator::Add, Atom::Integer(b)) => checked(a.checked_add(*b)),
             (Atom::Integer(a), BinaryOperator::Subtract, Atom::Integer(b)) => {
@@ -70,7 +85,7 @@ impl Interpreter {
             }
             // `%` is always float division, as in q.
             (Atom::Integer(a), BinaryOperator::Divide, Atom::Integer(b)) => {
-                Ok(Atom::Float(*a as f64 / *b as f64))
+                Ok(Atom::Float(long_to_float(*a) / long_to_float(*b)))
             }
 
             // Float arithmetic (with type promotion)
@@ -82,10 +97,10 @@ impl Interpreter {
 
             // Mixed integer/float arithmetic (promote to float)
             (Atom::Integer(a), op, Atom::Float(b)) => {
-                self.apply_binary_op(&Atom::Float(*a as f64), op, &Atom::Float(*b))
+                self.apply_binary_op(&Atom::Float(long_to_float(*a)), op, &Atom::Float(*b))
             }
             (Atom::Float(a), op, Atom::Integer(b)) => {
-                self.apply_binary_op(&Atom::Float(*a), op, &Atom::Float(*b as f64))
+                self.apply_binary_op(&Atom::Float(*a), op, &Atom::Float(long_to_float(*b)))
             }
 
             _ => Err(anyhow!(
@@ -99,6 +114,7 @@ impl Interpreter {
 
     fn apply_unary_op(&self, op: &UnaryOperator, operand: &Atom) -> Result<Atom> {
         match (op, operand) {
+            (UnaryOperator::Negate, Atom::Integer(i64::MIN)) => Ok(Atom::Integer(i64::MIN)),
             (UnaryOperator::Negate, Atom::Integer(n)) => checked(n.checked_neg()),
             (UnaryOperator::Negate, Atom::Float(f)) => Ok(Atom::Float(-f)),
             _ => Err(anyhow!("Invalid unary operation: {:?} {:?}", op, operand)),

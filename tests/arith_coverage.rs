@@ -28,5 +28,9 @@ fn negate_literal_matches_negate_expression() {
 
 #[test]
 fn negate_of_min_literal_is_error_not_panic() {
-    assert!(eval("-(-9223372036854775808)").is_err());
+    // i64::MIN is the long null `0N`; negating a null yields null.
+    assert_eq!(
+        eval("-(-9223372036854775808)").unwrap(),
+        Atom::Integer(i64::MIN)
+    );
 }
