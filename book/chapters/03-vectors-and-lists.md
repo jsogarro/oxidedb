@@ -11,7 +11,7 @@ oxidedb> 1 2 3 + 10
 ```
 No loop, no index: the `+` is applied to every item.
 
-In this book a **list** is the general word for an ordered collection of values, and a **vector** is a list whose items all have the same type. Every literal in this chapter is a vector. O stores it compactly and applies an operation to every item in one step instead of making you write a loop. A list of numbers is written by putting the numbers next to each other, separated by spaces.
+In this book a **list** is the general word for an ordered collection of values, and a **vector** is a list whose items all have the same type. Every list literal in this chapter is a vector. O stores it compactly and applies an operation to every item in one step instead of making you write a loop. A list of numbers is written by putting the numbers next to each other, separated by spaces.
 
 ## Vector Literals
 
@@ -97,7 +97,7 @@ The same-looking value can be an atom or a list. `5` is an atom; there is no way
 
 ## The Negative-Literal Trap
 
-A minus sign glued to a digit is part of the number in three places: at the start of a line (`-1 2 3`), after an operator or an opening bracket (`2*-1`), and after a space that follows a number (`2 -1`). So after a number `2 -1` is **a list of two numbers**, not subtraction. Subtraction needs spaces on both sides or on neither:
+A minus sign glued to a digit is part of the number in three places: at the start of a line (`-1 2 3`), after an operator or an opening bracket (`2*-1`), and after a space that follows any value (`2 -1`, `x -1`, `(1) -1`). So after a number `2 -1` is **a list of two numbers**, not subtraction. Subtraction needs spaces on both sides or on neither:
 ```
 oxidedb> 2 -1
 2 -1
@@ -112,7 +112,7 @@ oxidedb> -1 2 3
 oxidedb> 2*-1
 -2
 ```
-The most common trap is a variable. With `x:5`, `x -1` is **not** subtraction: a name is a value too, so it is two values side by side, and O reports `'nyi: application` (q would index `x` with `-1`). `x - 1` and `x-1` subtract:
+The most common trap is a variable. With `x:5`, `x -1` is **not** subtraction: a name is a value too, so it is two values side by side, and O reports `'nyi: application` (q would apply `x` to `-1`). `x - 1` and `x-1` subtract:
 ```
 oxidedb> x:5
 5
@@ -311,8 +311,8 @@ These parts of the chapter will be added as the features arrive. None of them wo
 4. Store a string in a variable and print it back. Is `"x"` a string or a character?
 5. Write a symbol vector of three names. Why can there be no spaces between the backticks?
 6. Predict the output of `5 0N 2.5`, then run it.
-7. Convert the temperatures `c:20 25 30` to Fahrenheit with `F = 32 + C * 9 / 5`. Write it in O with `%` for division and the right-to-left rule in mind: `32 + c * 9 % 5` gives `68 77 86f`.
-8. Predict `2 -1 + 1` before running it. Then explain why `x -1 + 1` fails when `x:5`. The answers are `3 0` (a two-item vector plus 1) and `'nyi: application` (a name next to a number is application, not subtraction).
+7. A shop sells three items at prices `p:10 20 30` in quantities `q:1 2 3`. Write the expression for the cost of each line (price times quantity), then the cost of each line with a flat fee of 5 added.
+8. Predict `10 20 30 - 1 2 3 * 2`, then `(10 20 30 - 1 2 3) * 2`. Which one subtracts first?
 
 ## Key Takeaways
 

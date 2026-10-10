@@ -54,7 +54,7 @@ oxidedb> 1e-3
 oxidedb> 2f
 2f
 ```
-O rejects a bare `1e` or `1e+` (in q `1e` is a real-typed literal), and so is a literal too large for a float (`1e999`: `'parse: float out of range`).
+O rejects a bare `1e` or `1e+` (in q `1e` is a real-typed literal). It also rejects a literal too large for a float (`1e999`: `'parse: float out of range`).
 
 ### Nulls and infinities
 `0N` is the long (integer) null, `0n` is the float null (it also shows up as the result of a calculation that is not a number), and `0w` and `-0w` are the float infinities. They display exactly as typed:
@@ -109,6 +109,7 @@ oxidedb> 1b + 0.5
 oxidedb> -1b
 -1
 ```
+The last line uses O's leading minus on a boolean (see Negative Numbers below; q writes `neg 1b`).
 
 ### Characters
 Single characters enclosed in double quotes (several characters in quotes make a string, which is a list of characters; see Chapter 3):

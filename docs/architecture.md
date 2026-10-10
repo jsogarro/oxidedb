@@ -43,7 +43,7 @@ Symbols have literals (`` `a `` is an atom, `` `a`b `` a vector); date, time and
 
 ## Error handling
 
-Lexing, parsing and evaluation return `Result<_, QError>` (`src/error.rs`). `QError` is a q-style error whose text is a quote and a short name: `'type`, `'overflow`, `'parse: <detail>`, `'<name> (Undefined variable)`, `'nyi: <detail>`; `length`, `rank`, `index`, `stack` and `signal` are defined for later features; `domain` is raised only by the `til`/`take` size limit in `builtins.rs`/`column.rs`, which the language cannot reach yet. Malformed input and the limits above are `Parse`, features O does not have yet (`0W`, adverbs, application) are `Nyi`, unsupported operand types are `Type`, and integer overflow is `Overflow`. A lexer error names the offending literal (`'parse: invalid literal: 2x...` for a number glued to a letter); the parser names an unexpected token in source form (`1 )` gives `'parse: unexpected ) after expression`). The REPL prints the error text on stderr and keeps the session; `run_file` stops at the first failing line and prints the error once with its line number (`line 3: 'type`); the `QError` stays the source of the returned `anyhow` error, and the process exits with status 1.
+Lexing, parsing and evaluation return `Result<_, QError>` (`src/error.rs`). `QError` is a q-style error whose text is a quote and a short name: `'type`, `'overflow`, `'parse: <detail>`, `'<name> (Undefined variable)`, `'nyi: <detail>`; `length` is raised by arithmetic on vectors of different lengths; `rank`, `index`, `stack` and `signal` are defined for later features; `domain` is raised only by the `til`/`take` size limit in `builtins.rs`/`column.rs`, which the language cannot reach yet. Malformed input and the limits above are `Parse`, features O does not have yet (`0W`, adverbs, application) are `Nyi`, unsupported operand types are `Type`, and integer overflow is `Overflow`. A lexer error names the offending literal (`'parse: invalid literal: 2x...` for a number glued to a letter); the parser names an unexpected token in source form (`1 )` gives `'parse: unexpected ) after expression`). The REPL prints the error text on stderr and keeps the session; `run_file` stops at the first failing line and prints the error once with its line number (`line 3: 'type`); the `QError` stays the source of the returned `anyhow` error, and the process exits with status 1.
 
 ## Testing
 
@@ -56,7 +56,7 @@ There are no `#[cfg(test)]` modules in `src/`.
 
 ## Planned
 
-Not implemented; nothing here is partially present.
+Not implemented in the language (the comparison kernel exists in `ops/compare.rs` but the grammar does not accept the verbs).
 
 - What is still missing: application (indexing and calls, `x 1`), general (mixed or nested) list literals, comparison verbs in the grammar, take and join, and index assignment.
 - Dictionaries and tables, and queries over them.

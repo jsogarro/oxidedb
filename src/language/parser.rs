@@ -174,7 +174,7 @@ impl Parser {
 
     fn unary(&mut self) -> QResult<Expr> {
         if self.match_tokens(&[Token::Minus]) {
-            // Monadic minus takes its whole right side, as in q: -x+3 is -(x+3).
+            // Monadic minus takes its whole right side (O's rule; q uses `neg`): -x+3 is -(x+3).
             let expr = self.expression()?;
             return Ok(Expr::UnaryOp {
                 operator: UnaryOperator::Negate,
@@ -203,7 +203,7 @@ impl Parser {
             Token::BoolList(bits) => Ok(vector(Column::Bool(bits.clone()))),
             Token::Symbol(s) => Ok(Expr::Symbol(s.clone())),
             Token::LeftParen => {
-                if self.check(&Token::RightParen) {
+                if self.check(&Token::RightParen) || self.check(&Token::Semicolon) {
                     return Err(QError::Nyi("general lists".into()));
                 }
                 let expr = self.expression()?;

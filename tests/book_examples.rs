@@ -53,6 +53,13 @@ fn check_o_file(name: &str, text: &str) -> Vec<String> {
         match pending.take() {
             Some((en, expected)) => {
                 expectations += 1;
+                if actual.starts_with('\'') {
+                    problems.push(format!(
+                        "{}:{}: `{}` is an error ({}): example files must run to completion; move error samples to the chapter",
+                        name, n, line, actual
+                    ));
+                    continue;
+                }
                 if actual != expected {
                     problems.push(format!(
                         "{}:{}: `{}` (expectation at line {})\n    expected: {}\n    actual:   {}",
@@ -240,6 +247,24 @@ fn book_chapter_samples_match() {
 }
 
 #[test]
+fn book_example_files_run_to_completion() {
+    for path in book_files("examples", "o") {
+        let out = std::process::Command::new(env!("CARGO_BIN_EXE_oxidedb"))
+            .arg(&path)
+            .env("NO_COLOR", "1")
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{} exited with {:?}: {}",
+            path.display(),
+            out.status.code(),
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+}
+
+#[test]
 fn book_readme_links_resolve() {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("book");
     let text = fs::read_to_string(dir.join("README.md")).unwrap();
@@ -361,6 +386,12 @@ fn checker_reports_wrong_and_missing_expectations() {
         &check_chapter("f.md", "no samples\n"),
         "no checked"
     ));
+}
+
+#[test]
+fn checker_rejects_expected_errors_in_example_files() {
+    let o = "// Expected output: 1\n1\n// Expected output: 'type\n1 + \"a\"\n";
+    assert!(reports(&check_o_file("f.o", o), "run to completion"));
 }
 
 #[test]

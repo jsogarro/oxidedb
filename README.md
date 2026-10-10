@@ -12,7 +12,7 @@ OxideDB aims to provide the power and expressiveness of Q/KDB+ with Rust's memor
 - **Interactive REPL**: Full-featured Read-Eval-Print Loop with command history
 - **File Execution**: Run O scripts directly from files (.o extension)
 - **Variable System**: Named values held in memory for the length of a session (nothing is saved to disk; REPL input history is kept in `~/.oxidedb_history`)
-- **Type System**: Integers, floats, booleans, characters and symbols, with null and infinity values (`0N`, `0n`, `0w`), symbols and vectors
+- **Type System**: Integers, floats, booleans, characters and symbols, with null and infinity values (`0N`, `0n`, `0w`), and vectors
 - **Comprehensive Documentation**: "O for Humans" book with executable examples
 - **Memory Safety**: Written in safe Rust
 
@@ -91,7 +91,7 @@ Phase 1 of the O language implementation is **complete** with a fully functional
 - ✅ Interactive REPL with file execution support
 
 #### Phase 2: Vectors and Lists (book Chapter 3) 🚧 **IN PROGRESS**
-- ✅ Vector literals (`1 2 3`, `1 2.5 3`, `101b`, `` `a`b ``, `"abc"`) and symbol atoms
+- ✅ Vector literals (`1 2 3`, `1 2.5 3`, `101b`, `` `a`b ``, `"abc"`), symbol atoms and vector arithmetic
 - ⏳ Vector creation and manipulation (`til`, `count`, take, join)
 - ⏳ Indexing and slicing
 - ✅ Vector arithmetic (`+ - * %` on atoms and vectors)
@@ -162,7 +162,7 @@ Complete guide to the O programming language located in `/book/`:
 - **Introduction**: Overview of O and OxideDB
 - **Chapter 1**: Atoms and Basic Arithmetic
 - **Chapter 2**: Variables and Assignment
-- **Chapter 3**: Vectors and Lists (in progress: vector literals)
+- **Chapter 3**: Vectors and Lists (in progress: vector literals and arithmetic)
 
 ### Executable Examples
 Run interactive examples from the book:

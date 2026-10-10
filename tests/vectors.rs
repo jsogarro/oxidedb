@@ -206,7 +206,9 @@ fn vec_lit_arithmetic_evaluates() {
 
 #[test]
 fn vec_lit_float_suffix_only_on_the_last_item() {
-    for src in ["1f 2", "1 2f 3", "1.5f 2", "1f -2", "1f 0N"] {
+    for src in [
+        "1f 2", "1 2f 3", "1.5f 2", "1f -2", "1f 0N", "1f -.5", "1f .5", "1f\t2",
+    ] {
         assert!(
             matches!(eval(src), Err(QError::Parse(m)) if m.starts_with("invalid literal: ")),
             "{src}"
@@ -304,7 +306,7 @@ fn vec_lit_glued_letters_are_invalid_literals() {
 #[test]
 fn vec_lit_parenthesised_semicolon_is_general_lists_nyi() {
     let nyi = Err(QError::Nyi("general lists".into()));
-    for src in ["(1;2;3)", "()", "(1 2;3)", "(1;)"] {
+    for src in ["(1;2;3)", "()", "(1 2;3)", "(1;)", "(;)", "(;1)", "(;;)"] {
         assert_eq!(eval(src), nyi, "{src}");
     }
 }

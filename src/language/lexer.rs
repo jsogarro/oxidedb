@@ -403,9 +403,10 @@ impl Lexer {
         let spaces = rest.iter().take_while(|c| c.is_whitespace()).count();
         let mut it = rest[spaces..].iter();
         spaces > 0
-            && match (it.next(), it.next()) {
-                (Some(c), _) if c.is_ascii_digit() => true,
-                (Some('-' | '.'), Some(d)) => d.is_ascii_digit(),
+            && match (it.next(), it.next(), it.next()) {
+                (Some(c), _, _) if c.is_ascii_digit() => true,
+                (Some('.'), Some(d), _) | (Some('-'), Some(d), _) if d.is_ascii_digit() => true,
+                (Some('-'), Some('.'), Some(d)) => d.is_ascii_digit(),
                 _ => false,
             }
     }
