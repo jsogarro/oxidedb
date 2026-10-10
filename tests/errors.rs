@@ -32,7 +32,7 @@ fn errors_display_q_style() {
 #[test]
 fn errors_parse_kind() {
     // lexer failures
-    for src in ["1e", "1e999", "-1e999", "_a:1", "é:1", "\"a", "$", "1x0N"] {
+    for src in ["1e", "1e999", "-1e999", "_a:1", "é:1", "\"a", "^", "1x0N"] {
         assert!(matches!(err(src), QError::Parse(_)), "{src}");
     }
     assert_eq!(

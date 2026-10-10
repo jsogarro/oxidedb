@@ -24,16 +24,31 @@ pub enum Token {
     Minus,
     Multiply,
     Divide,
+    Equal,
+    Less,
+    Greater,
+    NotEqual,
+    LessEqual,
+    GreaterEqual,
+    Hash,
+    Comma,
+    Bang,
+    Dollar,
+    At,
 
     // Adverbs (lexed; not yet parsed)
     Over,
     Scan,
+    EachPrior,
 
     // Punctuation
     LeftParen,
     RightParen,
     LeftBracket,
     RightBracket,
+    LeftBrace,
+    RightBrace,
+    Quote,
     Semicolon,
     Colon,
 
@@ -77,6 +92,21 @@ impl fmt::Display for Token {
             Token::Minus => write!(f, "-"),
             Token::Multiply => write!(f, "*"),
             Token::Divide => write!(f, "%"),
+            Token::Equal => write!(f, "="),
+            Token::Less => write!(f, "<"),
+            Token::Greater => write!(f, ">"),
+            Token::NotEqual => write!(f, "<>"),
+            Token::LessEqual => write!(f, "<="),
+            Token::GreaterEqual => write!(f, ">="),
+            Token::Hash => write!(f, "#"),
+            Token::Comma => write!(f, ","),
+            Token::Bang => write!(f, "!"),
+            Token::Dollar => write!(f, "$"),
+            Token::At => write!(f, "@"),
+            Token::EachPrior => write!(f, "':"),
+            Token::LeftBrace => write!(f, "{{"),
+            Token::RightBrace => write!(f, "}}"),
+            Token::Quote => write!(f, "'"),
             Token::Over => write!(f, "/"),
             Token::Scan => write!(f, "\\"),
             Token::LeftParen => write!(f, "("),
@@ -170,6 +200,38 @@ impl Lexer {
                     self.advance();
                     Ok(Token::Scan)
                 }
+                '=' => self.single(Token::Equal),
+                '<' => {
+                    self.advance();
+                    Ok(match self.current_char {
+                        Some('>') => self.single_token(Token::NotEqual),
+                        Some('=') => self.single_token(Token::LessEqual),
+                        _ => Token::Less,
+                    })
+                }
+                '>' => {
+                    self.advance();
+                    Ok(if self.current_char == Some('=') {
+                        self.single_token(Token::GreaterEqual)
+                    } else {
+                        Token::Greater
+                    })
+                }
+                '#' => self.single(Token::Hash),
+                ',' => self.single(Token::Comma),
+                '!' => self.single(Token::Bang),
+                '{' => self.single(Token::LeftBrace),
+                '}' => self.single(Token::RightBrace),
+                '$' => self.single(Token::Dollar),
+                '@' => self.single(Token::At),
+                '\'' => {
+                    self.advance();
+                    Ok(if self.current_char == Some(':') {
+                        self.single_token(Token::EachPrior)
+                    } else {
+                        Token::Quote
+                    })
+                }
                 '.' if self.next_is_digit() => self.read_number(),
                 '(' => {
                     self.advance();
@@ -203,6 +265,17 @@ impl Lexer {
                 _ => Err(QError::parse(format!("unexpected character: {ch}"))),
             },
         }
+    }
+
+    fn single(&mut self, token: Token) -> QResult<Token> {
+        self.advance();
+        Ok(token)
+    }
+
+    /// Consumes the current character as the tail of a multi-character token.
+    fn single_token(&mut self, token: Token) -> Token {
+        self.advance();
+        token
     }
 
     fn advance(&mut self) {

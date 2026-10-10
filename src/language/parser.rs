@@ -9,12 +9,27 @@ fn adverb_nyi(token: &Token) -> QError {
     QError::Nyi(format!("adverb '{}'", token))
 }
 
-/// Lexed list literals the parser cannot evaluate yet.
+/// Lexed tokens (list literals, verbs, punctuation) the parser cannot handle yet.
 fn literal_nyi(token: &Token) -> Option<QError> {
     let detail = match token {
         Token::Str(_) => "strings (a character literal holds exactly one character)",
         Token::Sym(_) | Token::SymList(_) => "symbols",
         Token::BoolList(_) => "boolean lists",
+        Token::Equal
+        | Token::Less
+        | Token::Greater
+        | Token::NotEqual
+        | Token::LessEqual
+        | Token::GreaterEqual
+        | Token::Hash
+        | Token::Comma
+        | Token::Bang
+        | Token::Dollar
+        | Token::At
+        | Token::EachPrior
+        | Token::LeftBrace
+        | Token::RightBrace
+        | Token::Quote => return Some(QError::Nyi(token.to_string())),
         _ => return None,
     };
     Some(QError::Nyi(detail.into()))
