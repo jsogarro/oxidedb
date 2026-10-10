@@ -95,7 +95,14 @@ fn repl_errors_go_to_stderr_results_to_stdout() {
     assert!(e.contains("Error"), "stderr: {e}");
     assert!(!o.contains("Error"), "stdout: {o}");
     assert!(o.contains('5'), "stdout: {o}");
-    assert!(!o.contains("x"), "comment line must print nothing: {o}");
+    // Two banner lines, then only the result: the comment-only line prints nothing.
+    let shown = o.replace("oxidedb> ", "");
+    let lines: Vec<&str> = shown
+        .lines()
+        .filter(|l| !l.is_empty() && *l != "Goodbye!")
+        .collect();
+    assert_eq!(lines.len(), 3, "stdout: {o}");
+    assert_eq!(lines[2], "5", "stdout: {o}");
     assert!(!home.join(".oxidedb_history").exists());
     let _ = std::fs::remove_dir_all(&home);
 }
