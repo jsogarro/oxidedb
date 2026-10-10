@@ -1,5 +1,6 @@
 use crate::error::{QError, QResult};
 use crate::types::atom::Atom;
+use crate::types::write_escaped;
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -73,18 +74,9 @@ impl fmt::Display for Token {
             Token::Sym(s) => write!(f, "`{s}"),
             Token::SymList(names) => names.iter().try_for_each(|s| write!(f, "`{s}")),
             Token::Str(s) => {
-                write!(f, "\"")?;
-                for c in s.chars() {
-                    match c {
-                        '"' => write!(f, "\\\"")?,
-                        '\\' => write!(f, "\\\\")?,
-                        '\n' => write!(f, "\\n")?,
-                        '\t' => write!(f, "\\t")?,
-                        '\r' => write!(f, "\\r")?,
-                        c => write!(f, "{c}")?,
-                    }
-                }
-                write!(f, "\"")
+                f.write_str("\"")?;
+                s.chars().try_for_each(|c| write_escaped(f, c))?;
+                f.write_str("\"")
             }
             Token::BoolList(bits) => {
                 bits.iter()
@@ -581,8 +573,29 @@ impl Lexer {
         })
     }
 
+    /// The rest of `\ooo` after its first digit; the value is the Unicode scalar with that
+    /// number (q's chars are bytes, so `\351` is `é` here).
+    fn octal_escape(&mut self, first: char) -> QResult<char> {
+        let mut text = String::from(first);
+        for k in 0..2 {
+            match self.input.get(self.position + k) {
+                Some(&c) if matches!(c, '0'..='7') => text.push(c),
+                _ => break,
+            }
+        }
+        match u8::from_str_radix(&text, 8) {
+            Ok(byte) if text.len() == 3 => {
+                self.advance();
+                self.advance();
+                Ok(char::from(byte))
+            }
+            _ => Err(QError::parse(format!("invalid escape: \\{text} in string"))),
+        }
+    }
+
     /// `"c"` is a character, anything else between quotes a string. A `\` escape
-    /// (`\" \\ \n \t \r`) is one character of the body.
+    /// (`\" \\ \n \t \r`, or `\ooo` with exactly three octal digits up to `\377`) is one
+    /// character of the body.
     fn read_character(&mut self) -> QResult<Token> {
         self.advance(); // Skip opening quote
 
@@ -606,6 +619,7 @@ impl Lexer {
                         'n' => '\n',
                         't' => '\t',
                         'r' => '\r',
+                        '0'..='7' => self.octal_escape(esc)?,
                         _ => {
                             return Err(QError::parse(format!("invalid escape: \\{esc} in string")))
                         }

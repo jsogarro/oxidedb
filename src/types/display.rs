@@ -66,7 +66,8 @@ impl fmt::Display for Column {
     }
 }
 
-/// A char as it appears inside a q string: `"`, `\` and control chars escaped.
+/// A char as it appears inside a q string: `"` and `\` backslashed, `\n \r \t` named, other
+/// control characters (C0, DEL and C1) as three-digit octal `\ooo`, which the lexer reads back.
 pub(crate) fn write_escaped(f: &mut fmt::Formatter, c: char) -> fmt::Result {
     match c {
         '"' => f.write_str("\\\""),
@@ -74,6 +75,7 @@ pub(crate) fn write_escaped(f: &mut fmt::Formatter, c: char) -> fmt::Result {
         '\n' => f.write_str("\\n"),
         '\t' => f.write_str("\\t"),
         '\r' => f.write_str("\\r"),
+        c if c.is_control() => write!(f, "\\{:03o}", u32::from(c)),
         c => f.write_char(c),
     }
 }
