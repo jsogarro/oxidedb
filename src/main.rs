@@ -4,7 +4,7 @@ use oxidedb::repl::Repl;
 use std::env;
 
 /// Stack for the interpreter thread. `evaluate` and the AST drop recurse once per node and the
-/// parser bounds the tree to about 2,100 levels, which needs about 3 MB in a debug build and under 1 MB in
+/// parser bounds the tree to 2,000 levels, which needs about 3 MB in a debug build and under 1 MB in
 /// release; 64 MB leaves 20x headroom for raising the limits. Address space is reserved, not committed.
 const INTERPRETER_STACK: usize = 64 * 1024 * 1024;
 

@@ -88,10 +88,13 @@ pub struct Parser {
 
 /// Maximum nesting of parentheses / monadic minus.
 const MAX_DEPTH: usize = 128;
-/// One budget per line, shared by every nesting level: each (sub)expression and each operator
-/// join spends one. The right-nested AST that evaluate and drop recurse over is at most this
-/// deep plus `MAX_DEPTH`, however the line mixes chains and nesting. A flat chain may hold 1,999
-/// operators (the line itself spends one).
+/// One budget per line, shared by every nesting level: each (sub)expression (nesting levels,
+/// unary minus and assignment values included) and each operator join spends one. The
+/// right-nested AST that evaluate and drop recurse over is therefore at most this deep,
+/// however the line mixes chains and nesting; assignment nesting is also capped by `MAX_DEPTH`.
+/// A flat chain may hold 1,999 operators (the line itself spends one). Evaluate lines on a
+/// thread with at least 4 MB of stack in debug builds (under 1 MB in release); the binary uses
+/// a dedicated 64 MB thread.
 const MAX_BUDGET: usize = 2_000;
 
 impl Parser {
@@ -124,7 +127,9 @@ impl Parser {
     fn spend(&mut self) -> QResult<()> {
         self.spent += 1;
         if self.spent > MAX_BUDGET {
-            return Err(QError::parse("expression too long"));
+            return Err(QError::parse(format!(
+                "expression too long (a line may hold at most {MAX_BUDGET} operators and sub-expressions)"
+            )));
         }
         Ok(())
     }

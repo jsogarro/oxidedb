@@ -4,19 +4,21 @@
 
 use oxidedb::{Interpreter, Lexer, Parser, Value};
 use std::io::Write;
-use std::process::{Command, Output, Stdio};
+use std::process::{Child, Command, Output, Stdio};
+use std::time::{Duration, Instant};
 
-const SRC_VAR: &str = "LINE_BUDGET_SRC";
 const STACK_VAR: &str = "LINE_BUDGET_STACK_KB";
 
-/// Child entry point: a no-op unless `SRC_VAR` is set. Lex, parse and evaluate on a thread
-/// with the stack size given in `STACK_VAR` (default 8 MB, the main thread of a library user).
+/// Child entry point: a no-op unless `STACK_VAR` is set. Reads the line from stdin, then lexes,
+/// parses and evaluates it on a thread with that many KB of stack.
 #[test]
 fn line_budget_probe() {
-    let Ok(src) = std::env::var(SRC_VAR) else {
+    let Ok(kb) = std::env::var(STACK_VAR) else {
         return;
     };
-    let kb: usize = std::env::var(STACK_VAR).map_or(8192, |s| s.parse().unwrap());
+    let kb: usize = kb.parse().unwrap();
+    let mut src = String::new();
+    std::io::Read::read_to_string(&mut std::io::stdin(), &mut src).unwrap();
     let line = std::thread::Builder::new()
         .stack_size(kb * 1024)
         .spawn(move || {
@@ -40,14 +42,37 @@ fn line_budget_probe() {
     println!("RESULT:{line}");
 }
 
+/// Waits for `child` at most 60 s, killing it (and failing the test) on a hang.
+fn wait_timeout(mut child: Child, what: &str) -> Output {
+    let deadline = Instant::now() + Duration::from_secs(60);
+    while child.try_wait().unwrap().is_none() {
+        if Instant::now() > deadline {
+            child.kill().unwrap();
+            panic!("{what} did not finish within 60s");
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    child.wait_with_output().unwrap()
+}
+
 /// Runs the probe in a child; `Ok(value text)`, `Err(error text)`, or panics on an abort.
 fn run_child(src: &str, stack_kb: usize) -> Result<String, String> {
-    let out = Command::new(std::env::current_exe().unwrap())
+    let mut child = Command::new(std::env::current_exe().unwrap())
         .args(["--exact", "line_budget_probe", "--nocapture"])
-        .env(SRC_VAR, src)
         .env(STACK_VAR, stack_kb.to_string())
-        .output()
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
         .unwrap();
+    // The child reads all of stdin; feed it from a thread so a full pipe cannot deadlock.
+    let mut stdin = child.stdin.take().unwrap();
+    let input = src.to_string();
+    let feeder = std::thread::spawn(move || {
+        let _ = stdin.write_all(input.as_bytes());
+    });
+    let out = wait_timeout(child, "probe");
+    feeder.join().unwrap();
     let stdout = String::from_utf8_lossy(&out.stdout);
     let result = stdout
         .lines()
@@ -115,6 +140,21 @@ fn leading_minus_variant_is_rejected() {
 }
 
 #[test]
+fn assignment_spends_from_the_budget() {
+    assert_rejected(&format!(
+        "{}1",
+        ("a:".to_string() + &"1+".repeat(217)).repeat(127)
+    ));
+    let level = "a:".to_string() + &"1+".repeat(217) + "(";
+    assert_rejected(&format!("{}1{}", level.repeat(127), ")".repeat(127)));
+    let colons = |ops: usize| format!("{}{}1", "a:".repeat(127), "1+".repeat(ops));
+    assert!(run_child(&colons(1872), 8192).is_ok());
+    assert!(run_child(&colons(1873), 8192)
+        .unwrap_err()
+        .contains("too long"));
+}
+
+#[test]
 fn mixed_shapes_are_rejected() {
     // Parentheses, minus and an assignment-free chain interleaved.
     let level = "1+".repeat(300) + "(- " + &"1+".repeat(300) + "(";
@@ -158,6 +198,15 @@ fn budget_boundary_is_pinned() {
     // ... and a minus inside the parentheses spends one more each.
     assert!(run_child(&sib(996, 997, "- "), 8192).is_ok());
     assert!(run_child(&sib(997, 997, "- "), 8192)
+        .unwrap_err()
+        .contains("too long"));
+    // ... and so does an assignment value, in either position (`(a:..)` and `(1+a:..)`).
+    assert!(run_child(&sib(996, 997, "a:"), 8192).is_ok());
+    assert!(run_child(&sib(997, 997, "a:"), 8192)
+        .unwrap_err()
+        .contains("too long"));
+    assert!(run_child(&sib(995, 996, "1+a:"), 8192).is_ok());
+    assert!(run_child(&sib(996, 996, "1+a:"), 8192)
         .unwrap_err()
         .contains("too long"));
     // Unary minus spends too: each `- ` is a nested expression.
@@ -239,4 +288,22 @@ fn binary_runs_on_its_own_stack() {
         out.status,
         String::from_utf8_lossy(&out.stderr)
     );
+}
+
+/// A write failure on stdout (closed pipe) is a panic in `println!`; it must reach the exit
+/// status through the interpreter thread, not be swallowed.
+#[test]
+fn binary_propagates_a_panic_from_the_interpreter_thread() {
+    let mut child = Command::new(BIN)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    drop(child.stdout.take());
+    let mut stdin = child.stdin.take().unwrap();
+    let _ = write!(stdin, "1+1\nexit\n");
+    drop(stdin);
+    let out = wait_timeout(child, "binary");
+    assert_eq!(out.status.code(), Some(101), "{:?}", out.status);
 }
