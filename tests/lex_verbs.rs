@@ -33,6 +33,9 @@ const SINGLES: &[(&str, Token)] = &[
     ("@", Token::At),
     ("'", Token::Quote),
     ("':", Token::EachPrior),
+    ("/:", Token::EachRight),
+    ("\\:", Token::EachLeft),
+    ("::", Token::DoubleColon),
 ];
 
 #[test]
@@ -140,10 +143,25 @@ fn lex_verbs_unknown_characters_still_rejected() {
 #[test]
 fn lex_verbs_parser_rejects_as_nyi() {
     for (src, _) in SINGLES {
-        for expr in [src.to_string(), format!("1{src}2"), format!("1 {src}")] {
+        // after whitespace (or at line start) a `/` starts a comment, so glue it to a `1`
+        for expr in [format!("1{src}"), format!("1{src}2"), format!("(1{src}")] {
             let err = eval_err(&expr);
-            assert_eq!(err, QError::Nyi(src.to_string()), "{expr}");
+            let detail = match *src {
+                "'" => "adverb ' (each)".to_string(),
+                "':" => "adverb ': (each-prior)".to_string(),
+                "/:" => "adverb /: (each-right)".to_string(),
+                "\\:" => "adverb \\: (each-left)".to_string(),
+                s => s.to_string(),
+            };
+            assert_eq!(err, QError::Nyi(detail), "{expr}");
         }
+    }
+    for src in ["=", "<", "{", "}", "'", "::"] {
+        let want = match src {
+            "'" => "adverb ' (each)",
+            s => s,
+        };
+        assert_eq!(eval_err(src), QError::Nyi(want.into()), "{src}");
     }
     assert_eq!(eval_err("=").to_string(), "'nyi: =");
     assert_eq!(eval_err("1<>2").to_string(), "'nyi: <>");
@@ -153,6 +171,128 @@ fn lex_verbs_parser_rejects_as_nyi() {
 fn lex_verbs_display_source_form() {
     for (src, token) in SINGLES {
         assert_eq!(token.to_string(), *src);
-        assert_eq!(lex(src), vec![token.clone()], "{src}");
+        if !src.starts_with('/') {
+            assert_eq!(lex(src), vec![token.clone()], "{src}");
+        }
+        // glued to a verb, so `/` and `\\` are not read as a comment or scan
+        assert_eq!(
+            lex(&format!("+{src}")),
+            vec![Token::Plus, token.clone()],
+            "+{src}"
+        );
     }
+}
+
+#[test]
+fn lex_verbs_greater_greater_is_two_tokens() {
+    assert_eq!(lex(">>"), vec![Token::Greater, Token::Greater]);
+    assert_eq!(lex(">>="), vec![Token::Greater, Token::GreaterEqual]);
+    assert_eq!(lex("<>>"), vec![Token::NotEqual, Token::Greater]);
+}
+
+#[test]
+fn lex_verbs_each_right_left_double_colon() {
+    assert_eq!(lex("+/:"), vec![Token::Plus, Token::EachRight]);
+    assert_eq!(lex("+\\:"), vec![Token::Plus, Token::EachLeft]);
+    assert_eq!(
+        lex("1/:2"),
+        vec![Token::Integer(1), Token::EachRight, Token::Integer(2)]
+    );
+    assert_eq!(
+        lex("x::1"),
+        vec![
+            Token::Symbol("x".into()),
+            Token::DoubleColon,
+            Token::Integer(1)
+        ]
+    );
+    assert_eq!(lex(":::"), vec![Token::DoubleColon, Token::Colon]);
+    assert_eq!(lex(": :"), vec![Token::Colon, Token::Colon]);
+    // a space splits them: `/` after space is a comment, `\` is a scan
+    assert_eq!(lex("+/ :"), vec![Token::Plus, Token::Over, Token::Colon]);
+    assert_eq!(lex("+\\ :"), vec![Token::Plus, Token::Scan, Token::Colon]);
+    // q: ` /` starts a comment, so a spaced `/:` is one
+    assert_eq!(lex("1 /: 2"), vec![Token::Integer(1)]);
+    assert_eq!(lex("/:"), vec![]);
+}
+
+/// Glued `-digit` after anything but a noun ending is a literal.
+#[test]
+fn lex_verbs_negative_literal_after_every_non_noun() {
+    for (src, token) in SINGLES {
+        if *token == Token::RightBrace {
+            continue;
+        }
+        let want = vec![Token::Integer(1), token.clone(), Token::Integer(-1)];
+        assert_eq!(lex(&format!("1{src}-1")), want, "{src}");
+        assert_eq!(lex(&format!("1{src} -1")), want, "{src}");
+    }
+    assert_eq!(lex("{-1"), vec![Token::LeftBrace, Token::Integer(-1)]);
+}
+
+/// After a noun-ending token a glued `-` is subtraction; a spaced one is a literal.
+#[test]
+fn lex_verbs_negative_literal_after_noun_endings() {
+    for (close, token) in [
+        (")", Token::RightParen),
+        ("]", Token::RightBracket),
+        ("}", Token::RightBrace),
+    ] {
+        assert_eq!(
+            lex(&format!("{close}-1")),
+            vec![token.clone(), Token::Minus, Token::Integer(1)],
+            "{close}"
+        );
+        assert_eq!(
+            lex(&format!("{close} -1")),
+            vec![token, Token::Integer(-1)],
+            "{close}"
+        );
+    }
+    assert_eq!(
+        lex("{x}-1"),
+        vec![
+            Token::LeftBrace,
+            Token::Symbol("x".into()),
+            Token::RightBrace,
+            Token::Minus,
+            Token::Integer(1)
+        ]
+    );
+}
+
+#[test]
+fn lex_verbs_nyi_inside_parentheses() {
+    for (src, detail) in [
+        ("(1=2)", "="),
+        ("x:(1<2)", "<"),
+        ("(1,2)", ","),
+        ("(1/2)", "adverb '/'"),
+        ("(1\\2)", "adverb '\\'"),
+        ("(1'2)", "adverb ' (each)"),
+        ("(1/:2)", "adverb /: (each-right)"),
+    ] {
+        assert_eq!(eval_err(src), QError::Nyi(detail.into()), "{src}");
+    }
+    // anything else still reports the missing parenthesis
+    for src in ["(1", "(1 2", "(1+"] {
+        assert!(matches!(eval_err(src), QError::Parse(_)), "{src}");
+    }
+    assert_eq!(
+        eval_err("(1 2").to_string(),
+        "'parse: expected ')' after expression"
+    );
+}
+
+#[test]
+fn lex_verbs_adverb_nyi_details_are_readable() {
+    assert_eq!(eval_err("1'2").to_string(), "'nyi: adverb ' (each)");
+    assert_eq!(eval_err("1':2").to_string(), "'nyi: adverb ': (each-prior)");
+    assert_eq!(eval_err("1/:2").to_string(), "'nyi: adverb /: (each-right)");
+    assert_eq!(
+        eval_err("1\\:2").to_string(),
+        "'nyi: adverb \\: (each-left)"
+    );
+    assert_eq!(eval_err("1::2").to_string(), "'nyi: ::");
+    assert_eq!(eval_err("6/2").to_string(), "'nyi: adverb '/'");
 }
