@@ -130,6 +130,28 @@ oxidedb> "\""
 "\""
 ```
 
+A backslash followed by exactly three octal digits (`\000` to `\377`) is one character with that code. The REPL prints control characters and DEL the same way, using the short forms above where they exist:
+```
+oxidedb> "\101"
+"A"
+oxidedb> "\001"
+"\001"
+oxidedb> "\011"
+"\t"
+oxidedb> "A\102"
+"AB"
+```
+One or two digits, a value above `\377`, and any other letter after the backslash are errors, as in q:
+```
+oxidedb> "\400"
+'parse: invalid escape: \400 in string
+oxidedb> "\1"
+'parse: invalid escape: \1 in string
+```
+In q a character is a byte, so `"\351"` is the single byte 0xE9 and prints as `"\351"`; in O a character is a Unicode scalar value, so `"\351"` is `é` and prints as itself. Only control characters (codes 0 to 31, 127 and 128 to 159) and the invisible no-break space and soft hyphen (`\240`, `\255`) print in octal.
+
+For the same reason octal escapes name characters, not bytes: UTF-8 written as octal bytes, `"\303\251"`, is two characters in O (`Ã` and `©`) but the single `é` in q. A backslash before a slash, `"\/"`, is `"/"`.
+
 ## Basic Arithmetic Operations
 
 O supports the four fundamental arithmetic operations:
