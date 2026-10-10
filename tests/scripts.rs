@@ -55,6 +55,41 @@ fn script_double_backslash_inside_block_does_not_end_script() {
 }
 
 #[test]
+fn script_double_backslash_followed_by_text_ends_script() {
+    // q ends the script at `\\` followed by whitespace and anything
+    assert_eq!(ok("dbs_text", "1\n\\\\ goodbye\n2\n"), "1\n");
+    assert_eq!(ok("dbs_tab", "1\n\\\\\tx\n2\n"), "1\n");
+}
+
+#[test]
+fn script_double_backslash_glued_to_text_is_a_system_command_error() {
+    let out = run("dbs_glued", "1\n\\\\ls\n2\n");
+    assert_eq!(out.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("line 2: 'nyi: system command"),
+        "stderr: {stderr}"
+    );
+    assert!(!stderr.contains("adverb"), "stderr: {stderr}");
+}
+
+#[test]
+fn repl_double_backslash_with_text_quits_and_glued_text_errors() {
+    let o = repl("1\n\\\\ bye\n2\n");
+    assert!(o.contains("Goodbye!") && !o.contains('2'), "stdout: {o}");
+    let mut child = Command::new(env!("CARGO_BIN_EXE_oxidedb"))
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child.stdin.take().unwrap().write_all(b"\\\\ls\n").unwrap();
+    let out = child.wait_with_output().unwrap();
+    let e = String::from_utf8_lossy(&out.stderr);
+    assert!(e.contains("'nyi: system command"), "stderr: {e}");
+}
+
+#[test]
 fn script_indented_double_backslash_is_not_the_exit_command() {
     let out = run("dbs_indent", "1\n \\\\\n2\n");
     assert_eq!(out.status.code(), Some(1));
@@ -180,4 +215,8 @@ fn history_path_prefers_home_then_userprofile() {
     );
     assert_eq!(p(None, Some("/u")), Some("/u/.oxidedb_history".into()));
     assert_eq!(p(None, None), None);
+    // set-but-empty counts as unset
+    assert_eq!(p(Some(""), Some("/u")), Some("/u/.oxidedb_history".into()));
+    assert_eq!(p(Some(""), Some("")), None);
+    assert_eq!(p(None, Some("")), None);
 }

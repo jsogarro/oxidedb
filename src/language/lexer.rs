@@ -589,12 +589,15 @@ impl Lexer {
                 self.advance();
                 Ok(char::from(byte))
             }
+            _ if self.input.get(self.position + text.len() - 1).is_none() => {
+                Err(QError::parse("unterminated character literal"))
+            }
             _ => Err(QError::parse(format!("invalid escape: \\{text} in string"))),
         }
     }
 
     /// `"c"` is a character, anything else between quotes a string. A `\` escape
-    /// (`\" \\ \n \t \r`, or `\ooo` with exactly three octal digits up to `\377`) is one
+    /// (`\" \\ \/ \n \t \r`, or `\ooo` with exactly three octal digits up to `\377`) is one
     /// character of the body.
     fn read_character(&mut self) -> QResult<Token> {
         self.advance(); // Skip opening quote
@@ -619,6 +622,7 @@ impl Lexer {
                         'n' => '\n',
                         't' => '\t',
                         'r' => '\r',
+                        '/' => '/',
                         '0'..='7' => self.octal_escape(esc)?,
                         _ => {
                             return Err(QError::parse(format!("invalid escape: \\{esc} in string")))

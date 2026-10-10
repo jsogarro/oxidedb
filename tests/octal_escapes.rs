@@ -1,5 +1,7 @@
 //! `\ooo` (exactly three octal digits, at most `\377`) is one character in character and string
-//! literals, and characters that are not printable ASCII display the same way.
+//! literals, and control characters (and the invisible U+00A0 and U+00AD) display the same way.
+//! Characters are Unicode scalar values: `\351` is U+00E9, and codes 160-255 other than
+//! U+00A0 and U+00AD print as themselves.
 use oxidedb::language::lexer::Token;
 use oxidedb::{Atom, Column, Interpreter, Lexer};
 
@@ -117,7 +119,7 @@ fn c1_controls_display_as_octal_and_other_latin1_raw() {
     assert_eq!(show(r#""\237""#), r#""\237""#);
     // deviation from q: chars are Unicode scalar values, not bytes, so \351 is "é"
     assert_eq!(show(r#""\351""#), "\"é\"");
-    assert_eq!(show(r#""\240""#), "\"\u{a0}\"");
+    assert_eq!(show(r#""\241""#), "\"\u{a1}\"");
 }
 
 #[test]
@@ -144,4 +146,39 @@ fn every_character_round_trips_through_display() {
 fn token_display_matches_value_display() {
     assert_eq!(Token::Character('\u{1}').to_string(), r#""\001""#);
     assert_eq!(Token::Str("a\u{1}\"".into()).to_string(), r#""a\001\"""#);
+}
+
+#[test]
+fn invisible_latin1_characters_display_as_octal() {
+    assert_eq!(show(r#""\240""#), r#""\240""#);
+    assert_eq!(show(r#""\255""#), r#""\255""#);
+    assert_eq!(show(r#""\241\254""#), "\"\u{a1}\u{ac}\"");
+}
+
+#[test]
+fn escaped_slash_is_a_slash() {
+    assert_eq!(lex(r#""\/""#), vec![Token::Character('/'), Token::Eof]);
+    assert_eq!(lex(r#""a\/b""#), vec![Token::Str("a/b".into()), Token::Eof]);
+    assert_eq!(show(r#""\/""#), r#""/""#);
+}
+
+#[test]
+fn octal_escape_cut_off_by_end_of_input_is_unterminated() {
+    assert_eq!(lex_err(r#""\10"#), "'parse: unterminated character literal");
+    assert_eq!(lex_err(r#""\1"#), "'parse: unterminated character literal");
+    assert_eq!(lex_err(r#""\"#), "'parse: unterminated character literal");
+    // with the closing quote present it is still a bad escape
+    assert_eq!(
+        lex_err(r#""\10""#),
+        "'parse: invalid escape: \\10 in string"
+    );
+}
+
+#[test]
+fn octal_escapes_name_characters_not_bytes() {
+    // UTF-8 bytes written as octal are two characters here (q: one, "é")
+    assert_eq!(
+        lex(r#""\303\251""#),
+        vec![Token::Str("\u{c3}\u{a9}".into()), Token::Eof]
+    );
 }
