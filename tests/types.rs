@@ -117,3 +117,79 @@ fn vector_from_atoms_round_trips_through_get() {
     let c = Column::from_atoms(&atoms).unwrap();
     assert_eq!((0..c.len()).map(|i| c.get(i)).collect::<Vec<_>>(), atoms);
 }
+
+#[test]
+fn vector_from_atoms_rejects_every_cross_type_pair() {
+    let all = [
+        Atom::Boolean(true),
+        Atom::Integer(1),
+        Atom::Float(1.0),
+        Atom::Character('a'),
+        Atom::from("a"),
+    ];
+    for (i, a) in all.iter().enumerate() {
+        for (j, b) in all.iter().enumerate() {
+            if i != j {
+                assert_eq!(
+                    Column::from_atoms(&[a.clone(), b.clone()]),
+                    None,
+                    "{a:?} {b:?}"
+                );
+                assert_eq!(
+                    Column::from_atoms(&[a.clone(), a.clone(), b.clone()]),
+                    None,
+                    "{a:?} {a:?} {b:?}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn vector_from_atoms_keeps_all_elements() {
+    assert_eq!(
+        Column::from_atoms(&[
+            Atom::Boolean(true),
+            Atom::Boolean(false),
+            Atom::Boolean(true)
+        ]),
+        Some(Column::Bool(vec![true, false, true]))
+    );
+    assert_eq!(
+        Column::from_atoms(&[Atom::Float(1.0), Atom::Float(2.0), Atom::Float(3.0)]),
+        Some(Column::Float(vec![1.0, 2.0, 3.0]))
+    );
+    assert_eq!(
+        Column::from_atoms(&[
+            Atom::Character('a'),
+            Atom::Character('b'),
+            Atom::Character('c')
+        ]),
+        Some(Column::Char(vec!['a', 'b', 'c']))
+    );
+    assert_eq!(
+        Column::from_atoms(&[Atom::from("a"), Atom::from("b"), Atom::from("c")]),
+        Some(Column::Sym(vec![sym("a"), sym("b"), sym("c")]))
+    );
+    assert_eq!(
+        Column::from_atoms(&[Atom::Integer(1), Atom::Integer(2), Atom::Integer(3)]),
+        Some(Column::Long(vec![1, 2, 3]))
+    );
+}
+
+#[test]
+fn vector_get_at_len_is_null_for_every_type() {
+    assert_eq!(Column::Bool(vec![true, true]).get(2), Atom::Boolean(false));
+    assert_eq!(Column::Long(vec![1, 2]).get(2), Atom::Integer(i64::MIN));
+    assert!(Column::Float(vec![1.0, 2.0]).get(2).is_null());
+    assert_eq!(Column::Char(vec!['a', 'b']).get(2), Atom::Character(' '));
+    assert_eq!(
+        Column::Sym(vec![sym("a"), sym("b")]).get(2),
+        Atom::Symbol(Sym::NULL)
+    );
+    assert_eq!(Column::Char(vec!['a', 'b']).get(1), Atom::Character('b'));
+    assert_eq!(
+        Column::Sym(vec![sym("a"), sym("b")]).get(1),
+        Atom::Symbol(sym("b"))
+    );
+}

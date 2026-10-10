@@ -25,7 +25,7 @@ oxidedb> x
 ## Variable Names
 
 Variable names in O follow these rules:
-- Must start with a letter or underscore
+- Must start with a letter or underscore (O accepts a leading underscore, but q does not, so prefer a letter)
 - Can contain letters, numbers, and underscores
 - Are case-sensitive
 
@@ -38,6 +38,8 @@ oxidedb> total_count:42
 oxidedb> x1:100
 100
 ```
+
+A name that starts with a digit is an error: `1x:2` is read as the number `1` followed by a stray name.
 
 ## Using Variables in Expressions
 
@@ -102,23 +104,42 @@ oxidedb> counter
 
 In the expression `counter:counter+1`, the right side (`counter+1`) is evaluated first using the old value of `counter`, then the result is assigned back to `counter`.
 
+## Chained Assignment and Assignment Inside Expressions
+
+Assignment is an expression, and it returns the assigned value. That lets you chain it, and use it in the middle of a larger expression:
+```
+oxidedb> p:q:7
+7
+oxidedb> p
+7
+oxidedb> q
+7
+oxidedb> (r:1)+2
+3
+oxidedb> r
+1
+```
+
 ## Variables Persist
 
 In the REPL, variables persist until you exit the session:
 ```
-oxidedb> name:"Alice"
-"Alice"
 oxidedb> age:25
 25
-oxidedb> name
-"Alice"
+oxidedb> initial:"A"
+"A"
 oxidedb> age
 25
+oxidedb> initial
+"A"
 ```
+
+Strings such as `"Alice"` are not implemented yet. A double-quoted value holds exactly one character, so `name:"Alice"` is an error today. Strings arrive in a later chapter.
 
 ## Working with Different Types
 
-Variables can store any type of atom:
+Variables can store any atom: integer, float, boolean or character. The type belongs to the value, so the same name can hold a different type later.
+
 ```
 oxidedb> number:42
 42
@@ -152,7 +173,7 @@ Error: Undefined variable: undefined_variable
 
 ## Exercises
 
-1. Create variables for your name and age, then display them
+1. Create variables for your age and the first letter of your name, then display them
 2. Calculate the area of a rectangle using width and height variables
 3. Create a temperature in Celsius and convert it to Fahrenheit using the formula: `F = 32 + (C * 9) % 5` (remember right-to-left evaluation; the result is a float, e.g. `77f` for 25)
 4. Try reassigning a variable and verify the new value
@@ -160,7 +181,8 @@ Error: Undefined variable: undefined_variable
 ## Key Takeaways
 
 - Use `:` for assignment: `variable:value`
-- Variable names are case-sensitive and start with letters/underscores
+- Variable names are case-sensitive and start with a letter (or underscore)
+- Assignment returns its value, so `x:y:7` and `(a:1)+2` work
 - Variables can be used in expressions like literal values
 - Right-to-left evaluation applies to expressions with variables
 - Variables persist throughout the REPL session

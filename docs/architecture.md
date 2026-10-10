@@ -16,9 +16,10 @@ OxideDB is designed as a modular system with clear separation of concerns betwee
 ### Types Module (`src/types/`)
 
 - **Atom** (`atom.rs`): Scalar values with Q's type system
-- **Vector** (`vector.rs`): Homogeneous arrays of atoms
-- **Dictionary** (`dictionary.rs`): Key-value mappings
-- **Table** (`table.rs`): Columnar data structures
+- **Sym** (`sym.rs`): Interned symbols
+- **Column** (`column.rs`): Typed vectors (bool, long, float, char, symbol); not yet reachable from the language
+
+Dictionaries and tables are planned (see below).
 
 ### Planned
 
