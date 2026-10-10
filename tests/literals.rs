@@ -240,3 +240,41 @@ fn non_ascii_identifier_chars_are_errors() {
         assert!(lex_err(src).contains("ASCII"), "{src}");
     }
 }
+
+// ---- pinned edge behaviour ----
+
+#[test]
+fn float_suffix_is_lowercase_only() {
+    assert!(eval("1F").is_err());
+}
+
+#[test]
+fn float_underflow_is_accepted() {
+    assert_eq!(show("1e-400"), "0f");
+    assert_eq!(show("-1e-400"), "-0f");
+}
+
+// ---- lexer invariants ----
+
+/// Tricky inputs must terminate (Ok or Err) and never yield an empty symbol.
+#[test]
+fn lexer_terminates_and_never_yields_empty_symbol() {
+    let inputs = [
+        "é", "aé", "0Né", "1fé", "a é", "éa", "x٣", "_", "a_é", "日本", "1e5é", "0wé", "é1",
+    ];
+    for src in inputs {
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = tx.send(Lexer::new(src).tokenize().map(|t| {
+                t.iter().any(
+                    |t| matches!(t, oxidedb::language::lexer::Token::Symbol(s) if s.is_empty()),
+                )
+            }));
+        });
+        match rx.recv_timeout(std::time::Duration::from_secs(2)) {
+            Ok(Ok(has_empty)) => assert!(!has_empty, "{src:?} produced an empty symbol"),
+            Ok(Err(_)) => {}
+            Err(_) => panic!("{src:?} did not terminate"),
+        }
+    }
+}

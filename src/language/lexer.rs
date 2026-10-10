@@ -38,12 +38,7 @@ pub enum Token {
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Token::Integer(i64::MIN) => write!(f, "0N"),
             Token::Integer(n) => write!(f, "{}", n),
-            Token::Float(n) if n.is_nan() => write!(f, "0n"),
-            Token::Float(n) if n.is_infinite() => {
-                write!(f, "{}0w", if *n < 0.0 { "-" } else { "" })
-            }
             Token::Float(n) => write!(f, "{}", n),
             Token::Boolean(b) => write!(f, "{}", if *b { "1b" } else { "0b" }),
             Token::Character(c) => write!(f, "\"{}\"", c),
@@ -75,7 +70,7 @@ fn bad_identifier_char(ch: char) -> anyhow::Error {
 }
 
 fn is_ident_char(c: char) -> bool {
-    c.is_alphanumeric() || c == '_'
+    c.is_ascii_alphanumeric() || c == '_'
 }
 
 pub struct Lexer {
@@ -337,18 +332,18 @@ impl Lexer {
         }
     }
 
+    /// Called only on an ASCII letter: consumes it unconditionally, so this can
+    /// never return without advancing.
     fn read_identifier(&mut self) -> Result<Token> {
         let mut identifier = String::new();
-
         while let Some(ch) = self.current_char {
-            if ch.is_ascii_alphanumeric() || ch == '_' {
+            if identifier.is_empty() || is_ident_char(ch) {
                 identifier.push(ch);
                 self.advance();
             } else {
                 break;
             }
         }
-
         Ok(Token::Symbol(identifier))
     }
 

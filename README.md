@@ -12,7 +12,7 @@ OxideDB aims to provide the power and expressiveness of Q/KDB+ with Rust's memor
 - **Interactive REPL**: Full-featured Read-Eval-Print Loop with command history
 - **File Execution**: Run O scripts directly from files (.o extension)
 - **Variable System**: Named values held in memory for the length of a session (nothing is saved to disk; REPL input history is kept in `~/.oxidedb_history`)
-- **Type System**: Integers, floats, booleans and characters (symbol literals are not implemented yet)
+- **Type System**: Integers, floats, booleans and characters, with null and infinity values (`0N`, `0n`, `0w`) (symbol literals are not implemented yet)
 - **Comprehensive Documentation**: "O for Humans" book with executable examples
 - **Memory Safety**: Written in safe Rust
 
@@ -186,6 +186,7 @@ While O is inspired by Q, there are some important differences:
 - **Language Name**: O (instead of Q)
 - **File Extension**: `.o` files (instead of `.q`)
 - **Division Operator**: `%` (same as Q): always returns a float, and division by zero follows IEEE 754 (`1%0` is `0w`)
+- **Deliberate deviations**: integer overflow is an error (q wraps around), and an out-of-range float literal such as `1e999` is an error. Nulls (`0N`, `0n`) propagate through arithmetic.
 - **Exit Commands**: `exit`, `quit`, or `\\` (Q standard)
 - **Right-to-Left Evaluation**: Fully implemented like Q
 
