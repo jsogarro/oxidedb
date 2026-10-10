@@ -166,7 +166,7 @@ cargo run -- book/examples/02-variables-and-assignment.o
 The codebase is organized into several modules:
 
 - `language/`: Lexer, parser, AST, and interpreter for O language
-- `types/`: Core data types (atoms are implemented; vectors, dictionaries and tables are placeholders)
+- `types/`: Core data types (atoms, interned symbols and typed columns are implemented; dictionaries and tables are planned)
 - `repl/`: Interactive REPL interface with file execution support
 - `book/`: Complete "O for Humans" documentation and examples
 
