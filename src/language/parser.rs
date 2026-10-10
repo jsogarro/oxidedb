@@ -5,8 +5,35 @@ use crate::language::{
 };
 use crate::types::atom::Atom;
 
-fn adverb_nyi(token: &Token) -> QError {
-    QError::Nyi(format!("adverb '{}'", token))
+/// The not-yet-implemented error for a token the parser cannot handle yet
+/// (list literals, adverbs, verbs, punctuation); `None` for any other token.
+fn nyi_token(token: &Token) -> Option<QError> {
+    let detail = match token {
+        Token::Str(_) => "strings (a character literal holds exactly one character)".to_string(),
+        Token::Sym(_) | Token::SymList(_) => "symbols".to_string(),
+        Token::BoolList(_) => "boolean lists".to_string(),
+        Token::Over | Token::Scan => format!("adverb '{token}'"),
+        Token::Quote => "adverb ' (each)".to_string(),
+        Token::EachPrior => "adverb ': (each-prior)".to_string(),
+        Token::EachRight => "adverb /: (each-right)".to_string(),
+        Token::EachLeft => "adverb \\: (each-left)".to_string(),
+        Token::Equal
+        | Token::Less
+        | Token::Greater
+        | Token::NotEqual
+        | Token::LessEqual
+        | Token::GreaterEqual
+        | Token::Hash
+        | Token::Comma
+        | Token::Bang
+        | Token::Dollar
+        | Token::At
+        | Token::LeftBrace
+        | Token::RightBrace
+        | Token::DoubleColon => token.to_string(),
+        _ => return None,
+    };
+    Some(QError::Nyi(detail))
 }
 
 pub struct Parser {
@@ -35,8 +62,8 @@ impl Parser {
     pub fn parse(&mut self) -> QResult<Expr> {
         let expr = self.expression()?;
         if !self.is_at_end() {
-            if matches!(self.peek(), Token::Over | Token::Scan) {
-                return Err(adverb_nyi(self.peek()));
+            if let Some(err) = nyi_token(self.peek()) {
+                return Err(err);
             }
             return Err(QError::parse(format!(
                 "unexpected {} after expression",
@@ -145,12 +172,15 @@ impl Parser {
             Token::LeftParen => {
                 let expr = self.expression()?;
                 if !self.match_tokens(&[Token::RightParen]) {
-                    return Err(QError::parse("expected ')' after expression"));
+                    return Err(nyi_token(self.peek())
+                        .unwrap_or_else(|| QError::parse("expected ')' after expression")));
                 }
                 Ok(expr)
             }
-            token @ (Token::Over | Token::Scan) => Err(adverb_nyi(token)),
-            token => Err(QError::parse(format!("unexpected {}", token))),
+            token => {
+                Err(nyi_token(token)
+                    .unwrap_or_else(|| QError::parse(format!("unexpected {}", token))))
+            }
         }
     }
 
