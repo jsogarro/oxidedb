@@ -94,6 +94,20 @@ fn nesting_times_chain_is_rejected() {
 }
 
 #[test]
+fn every_verb_spends_from_the_budget() {
+    for verb in [
+        "-", "*", "%", "=", "<", ">", "<>", "<=", ">=", "#", ",", "!",
+    ] {
+        let level = format!("{}(", format!("1{verb}").repeat(217));
+        assert_rejected(&format!("{}1{}", level.repeat(127), ")".repeat(127)));
+        let flat = format!("{}1", format!("1{verb}").repeat(2000));
+        assert!(run_child(&flat, 8192).unwrap_err().contains("too long"));
+    }
+    // Under the budget a non-arithmetic chain still evaluates.
+    assert!(run_child(&format!("{}1", "1,".repeat(1999)), 8192).is_ok());
+}
+
+#[test]
 fn leading_minus_variant_is_rejected() {
     for (levels, terms) in [(127, 217), (32, 858)] {
         assert_rejected(&format!("{}1", ("1+".repeat(terms) + "- ").repeat(levels)));
