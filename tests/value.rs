@@ -186,17 +186,7 @@ fn value_non_atom_arithmetic_evaluates() {
 
 #[test]
 fn value_unimplemented_verbs_are_nyi() {
-    let verbs = [
-        (Verb::Equal, "="),
-        (Verb::Less, "<"),
-        (Verb::Greater, ">"),
-        (Verb::NotEqual, "<>"),
-        (Verb::LessEqual, "<="),
-        (Verb::GreaterEqual, ">="),
-        (Verb::Take, "#"),
-        (Verb::Join, ","),
-        (Verb::Key, "!"),
-    ];
+    let verbs = [(Verb::Take, "#"), (Verb::Join, ","), (Verb::Key, "!")];
     for (operator, sym) in verbs {
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Atom(Atom::Integer(1))),
@@ -386,10 +376,10 @@ fn value_new_verbs_on_any_operand_are_nyi_by_verb() {
     ] {
         let e = Expr::BinaryOp {
             left: Box::new(Expr::Atom(l)),
-            operator: Verb::Equal,
+            operator: Verb::Join,
             right: Box::new(Expr::Atom(r)),
         };
-        assert_eq!(i.evaluate(e), Err(QError::Nyi("=".into())));
+        assert_eq!(i.evaluate(e), Err(QError::Nyi(",".into())));
     }
     let e = Expr::BinaryOp {
         left: Box::new(Expr::Symbol("v".into())),
