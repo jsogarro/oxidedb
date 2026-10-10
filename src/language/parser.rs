@@ -16,7 +16,14 @@ impl Parser {
     }
 
     pub fn parse(&mut self) -> Result<Expr> {
-        self.expression()
+        let expr = self.expression()?;
+        if !self.is_at_end() {
+            return Err(anyhow!(
+                "Unexpected token after expression: {:?}",
+                self.peek()
+            ));
+        }
+        Ok(expr)
     }
 
     fn expression(&mut self) -> Result<Expr> {
@@ -76,6 +83,9 @@ impl Parser {
     }
 
     fn primary(&mut self) -> Result<Expr> {
+        if self.is_at_end() {
+            return Err(anyhow!("Unexpected end of input"));
+        }
         match self.advance() {
             Token::Integer(n) => Ok(Expr::Atom(Atom::Integer(*n))),
             Token::Float(f) => Ok(Expr::Atom(Atom::Float(*f))),
