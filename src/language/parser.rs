@@ -1,6 +1,9 @@
-use anyhow::{Result, anyhow};
-use crate::language::{lexer::Token, ast::{Expr, BinaryOperator, UnaryOperator}};
+use crate::language::{
+    ast::{BinaryOperator, Expr, UnaryOperator},
+    lexer::Token,
+};
 use crate::types::atom::Atom;
+use anyhow::{anyhow, Result};
 
 pub struct Parser {
     tokens: Vec<Token>,
@@ -9,10 +12,7 @@ pub struct Parser {
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
-        Self {
-            tokens,
-            current: 0,
-        }
+        Self { tokens, current: 0 }
     }
 
     pub fn parse(&mut self) -> Result<Expr> {
@@ -25,7 +25,7 @@ impl Parser {
 
     fn assignment(&mut self) -> Result<Expr> {
         let expr = self.binary_expression()?;
-        
+
         // Check if this is an assignment (symbol followed by colon)
         if let Expr::Symbol(name) = &expr {
             if self.match_tokens(&[Token::Colon]) {
@@ -36,13 +36,13 @@ impl Parser {
                 });
             }
         }
-        
+
         Ok(expr)
     }
 
     fn binary_expression(&mut self) -> Result<Expr> {
         let left = self.unary()?;
-        
+
         if self.match_tokens(&[Token::Plus, Token::Minus, Token::Multiply, Token::Divide]) {
             let operator = match self.previous() {
                 Token::Plus => BinaryOperator::Add,

@@ -1,10 +1,16 @@
-use anyhow::{Result, anyhow};
-use std::collections::HashMap;
-use crate::language::ast::{Expr, BinaryOperator, UnaryOperator};
+use crate::language::ast::{BinaryOperator, Expr, UnaryOperator};
 use crate::types::atom::Atom;
+use anyhow::{anyhow, Result};
+use std::collections::HashMap;
 
 pub struct Interpreter {
     variables: HashMap<String, Atom>,
+}
+
+impl Default for Interpreter {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Interpreter {
@@ -17,12 +23,16 @@ impl Interpreter {
     pub fn evaluate(&mut self, expr: Expr) -> Result<Atom> {
         match expr {
             Expr::Atom(atom) => Ok(atom),
-            Expr::Symbol(name) => {
-                self.variables.get(&name)
-                    .cloned()
-                    .ok_or_else(|| anyhow!("Undefined variable: {}", name))
-            }
-            Expr::BinaryOp { left, operator, right } => {
+            Expr::Symbol(name) => self
+                .variables
+                .get(&name)
+                .cloned()
+                .ok_or_else(|| anyhow!("Undefined variable: {}", name)),
+            Expr::BinaryOp {
+                left,
+                operator,
+                right,
+            } => {
                 let left_val = self.evaluate(*left)?;
                 let right_val = self.evaluate(*right)?;
                 self.apply_binary_op(&left_val, &operator, &right_val)
@@ -43,8 +53,12 @@ impl Interpreter {
         match (left, op, right) {
             // Integer arithmetic
             (Atom::Integer(a), BinaryOperator::Add, Atom::Integer(b)) => Ok(Atom::Integer(a + b)),
-            (Atom::Integer(a), BinaryOperator::Subtract, Atom::Integer(b)) => Ok(Atom::Integer(a - b)),
-            (Atom::Integer(a), BinaryOperator::Multiply, Atom::Integer(b)) => Ok(Atom::Integer(a * b)),
+            (Atom::Integer(a), BinaryOperator::Subtract, Atom::Integer(b)) => {
+                Ok(Atom::Integer(a - b))
+            }
+            (Atom::Integer(a), BinaryOperator::Multiply, Atom::Integer(b)) => {
+                Ok(Atom::Integer(a * b))
+            }
             (Atom::Integer(a), BinaryOperator::Divide, Atom::Integer(b)) => {
                 if *b == 0 {
                     Err(anyhow!("Division by zero"))
@@ -52,7 +66,7 @@ impl Interpreter {
                     Ok(Atom::Integer(a / b))
                 }
             }
-            
+
             // Float arithmetic (with type promotion)
             (Atom::Float(a), BinaryOperator::Add, Atom::Float(b)) => Ok(Atom::Float(a + b)),
             (Atom::Float(a), BinaryOperator::Subtract, Atom::Float(b)) => Ok(Atom::Float(a - b)),
@@ -64,7 +78,7 @@ impl Interpreter {
                     Ok(Atom::Float(a / b))
                 }
             }
-            
+
             // Mixed integer/float arithmetic (promote to float)
             (Atom::Integer(a), op, Atom::Float(b)) => {
                 self.apply_binary_op(&Atom::Float(*a as f64), op, &Atom::Float(*b))
@@ -72,8 +86,13 @@ impl Interpreter {
             (Atom::Float(a), op, Atom::Integer(b)) => {
                 self.apply_binary_op(&Atom::Float(*a), op, &Atom::Float(*b as f64))
             }
-            
-            _ => Err(anyhow!("Invalid binary operation: {:?} {:?} {:?}", left, op, right)),
+
+            _ => Err(anyhow!(
+                "Invalid binary operation: {:?} {:?} {:?}",
+                left,
+                op,
+                right
+            )),
         }
     }
 

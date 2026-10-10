@@ -1,10 +1,16 @@
-use anyhow::Result;
 use crate::types::table::Table;
+use anyhow::Result;
 
 #[derive(Debug)]
 pub struct QueryEngine {
     // Placeholder for query execution functionality
     _marker: std::marker::PhantomData<()>,
+}
+
+impl Default for QueryEngine {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl QueryEngine {

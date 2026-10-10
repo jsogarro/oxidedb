@@ -1,10 +1,16 @@
-use anyhow::Result;
 use crate::types::table::Table;
+use anyhow::Result;
 
 #[derive(Debug)]
 pub struct StorageEngine {
     // Placeholder for storage functionality
     _marker: std::marker::PhantomData<()>,
+}
+
+impl Default for StorageEngine {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl StorageEngine {

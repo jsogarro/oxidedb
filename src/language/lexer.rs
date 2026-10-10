@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -9,13 +9,13 @@ pub enum Token {
     Boolean(bool),
     Character(char),
     Symbol(String),
-    
+
     // Operators
     Plus,
     Minus,
     Multiply,
     Divide,
-    
+
     // Punctuation
     LeftParen,
     RightParen,
@@ -23,10 +23,10 @@ pub enum Token {
     RightBracket,
     Semicolon,
     Colon,
-    
+
     // Assignment
     Assignment,
-    
+
     // End of file
     Eof,
 }
@@ -64,8 +64,8 @@ pub struct Lexer {
 impl Lexer {
     pub fn new(input: &str) -> Self {
         let chars: Vec<char> = input.chars().collect();
-        let current_char = chars.get(0).copied();
-        
+        let current_char = chars.first().copied();
+
         Self {
             input: chars,
             position: 0,
@@ -75,7 +75,7 @@ impl Lexer {
 
     pub fn tokenize(&mut self) -> Result<Vec<Token>> {
         let mut tokens = Vec::new();
-        
+
         loop {
             match self.next_token()? {
                 Token::Eof => {
@@ -85,13 +85,13 @@ impl Lexer {
                 token => tokens.push(token),
             }
         }
-        
+
         Ok(tokens)
     }
 
     fn next_token(&mut self) -> Result<Token> {
         self.skip_whitespace();
-        
+
         match self.current_char {
             None => Ok(Token::Eof),
             Some(ch) => match ch {
@@ -139,7 +139,7 @@ impl Lexer {
                 ch if ch.is_ascii_digit() => self.read_number(),
                 ch if ch.is_alphabetic() || ch == '_' => self.read_identifier(),
                 _ => Err(anyhow!("Unexpected character: {}", ch)),
-            }
+            },
         }
     }
 
@@ -147,7 +147,6 @@ impl Lexer {
         self.position += 1;
         self.current_char = self.input.get(self.position).copied();
     }
-
 
     fn skip_whitespace(&mut self) {
         while let Some(ch) = self.current_char {
@@ -162,7 +161,7 @@ impl Lexer {
     fn read_number(&mut self) -> Result<Token> {
         let mut number = String::new();
         let mut is_float = false;
-        
+
         while let Some(ch) = self.current_char {
             if ch.is_ascii_digit() {
                 number.push(ch);
@@ -175,13 +174,15 @@ impl Lexer {
                 break;
             }
         }
-        
+
         if is_float {
-            let value = number.parse::<f64>()
+            let value = number
+                .parse::<f64>()
                 .map_err(|_| anyhow!("Invalid float: {}", number))?;
             Ok(Token::Float(value))
         } else {
-            let value = number.parse::<i64>()
+            let value = number
+                .parse::<i64>()
                 .map_err(|_| anyhow!("Invalid integer: {}", number))?;
             Ok(Token::Integer(value))
         }
@@ -189,7 +190,7 @@ impl Lexer {
 
     fn read_identifier(&mut self) -> Result<Token> {
         let mut identifier = String::new();
-        
+
         while let Some(ch) = self.current_char {
             if ch.is_alphanumeric() || ch == '_' {
                 identifier.push(ch);
@@ -198,23 +199,25 @@ impl Lexer {
                 break;
             }
         }
-        
+
         // Check for boolean literals
         let token = match identifier.as_str() {
             "1b" => Token::Boolean(true),
             "0b" => Token::Boolean(false),
             _ => Token::Symbol(identifier),
         };
-        
+
         Ok(token)
     }
 
     fn read_character(&mut self) -> Result<Token> {
         self.advance(); // Skip opening quote
-        
-        let ch = self.current_char.ok_or_else(|| anyhow!("Unterminated character literal"))?;
+
+        let ch = self
+            .current_char
+            .ok_or_else(|| anyhow!("Unterminated character literal"))?;
         self.advance();
-        
+
         if self.current_char == Some('"') {
             self.advance(); // Skip closing quote
             Ok(Token::Character(ch))

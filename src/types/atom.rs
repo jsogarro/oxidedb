@@ -1,5 +1,5 @@
+use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use std::fmt;
-use chrono::{DateTime, Utc, NaiveDate, NaiveTime};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Atom {
@@ -8,15 +8,15 @@ pub enum Atom {
     Integer(i64),
     Float(f64),
     Character(char),
-    
+
     // Temporal types
     Date(NaiveDate),
     Time(NaiveTime),
     Timestamp(DateTime<Utc>),
-    
+
     // String/Symbol
     Symbol(String),
-    
+
     // Null values for each type
     NullBoolean,
     NullInteger,
@@ -43,15 +43,16 @@ impl Atom {
     }
 
     pub fn is_null(&self) -> bool {
-        matches!(self, 
-            Atom::NullBoolean | 
-            Atom::NullInteger | 
-            Atom::NullFloat | 
-            Atom::NullCharacter |
-            Atom::NullDate |
-            Atom::NullTime |
-            Atom::NullTimestamp |
-            Atom::NullSymbol
+        matches!(
+            self,
+            Atom::NullBoolean
+                | Atom::NullInteger
+                | Atom::NullFloat
+                | Atom::NullCharacter
+                | Atom::NullDate
+                | Atom::NullTime
+                | Atom::NullTimestamp
+                | Atom::NullSymbol
         )
     }
 
