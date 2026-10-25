@@ -131,11 +131,9 @@ impl Parser {
     /// parses to itself; anything else (`;` present) is an `Expr::Sequence`.
     pub fn parse(&mut self) -> QResult<Expr> {
         let mut statements = Vec::new();
-        let mut separated = false;
-        let mut silent = false;
+        let mut silent = false; // the line ends in `;`
         loop {
             if self.match_tokens(&[Token::Semicolon]) {
-                separated = true;
                 silent = true;
                 continue;
             }
@@ -147,12 +145,11 @@ impl Parser {
             if !self.match_tokens(&[Token::Semicolon]) {
                 break;
             }
-            separated = true;
             silent = true;
         }
-        let expr = match (statements.len(), separated) {
-            (0, false) => return Err(QError::parse("unexpected end of input")),
-            (1, false) => statements.remove(0),
+        let expr = match statements.len() {
+            0 if !silent => return Err(QError::parse("unexpected end of input")),
+            1 if !silent => statements.remove(0),
             _ => Expr::Sequence { statements, silent },
         };
         if !self.is_at_end() {
@@ -213,11 +210,13 @@ impl Parser {
         let mut joins = Vec::new();
         loop {
             let mut operand = self.unary()?;
-            // `v[0]:5`, wherever it stands in the chain; it takes the rest of the statement (up to the next `;`).
+            // `v[0]:5`, wherever it stands in the chain; it takes the rest of the statement
+            // (up to the next `;`).
             if matches!(operand, Expr::Apply { .. }) && self.match_tokens(&[Token::Colon]) {
                 operand = self.index_assignment(operand)?;
             }
-            // An assignment in operand position (`x+y:2`) takes the rest of the statement, up to the next `;`.
+            // An assignment in operand position (`x+y:2`) takes the rest of the statement (up to
+            // the next `;`).
             if let (false, Expr::Symbol(name)) = (operands.is_empty(), &operand) {
                 if self.match_tokens(&[Token::Colon]) {
                     assignable(name)?;

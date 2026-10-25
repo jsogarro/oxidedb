@@ -149,7 +149,7 @@ oxidedb> pears
 oxidedb> apples:1;;pears:2;apples+pears
 3
 ```
-If a statement fails, the rest of the line is not run, but what the earlier statements did stays done:
+If a statement fails when it runs, the rest of the line is not run, but what the earlier statements did stays done (a line that does not even parse runs none of it):
 ```
 oxidedb> misses:0;
 oxidedb> hits:1;nope;hits:2

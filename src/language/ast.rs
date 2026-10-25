@@ -20,7 +20,7 @@ pub enum Expr {
         args: Vec<Expr>,
     },
     /// Statements `a;b;c` at the top level of a line, run left to right. The value is the last
-    /// statement's (`()` when there is none); `silent` marks a trailing `;`, which prints nothing.
+    /// statement's (`()` when there is none); `silent` marks a trailing `;`, which prints nothing (only `eval_line` reads it).
     Sequence {
         statements: Vec<Expr>,
         silent: bool,
