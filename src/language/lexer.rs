@@ -324,12 +324,6 @@ impl Lexer {
         }
     }
 
-    fn ident_char_at(&self, offset: usize) -> bool {
-        self.input
-            .get(self.position + offset)
-            .is_some_and(|c| is_ident_char(*c))
-    }
-
     fn next_is_digit(&self) -> bool {
         self.input
             .get(self.position + 1)
@@ -377,18 +371,6 @@ impl Lexer {
         rest.get(digits) == Some(&'b') && !rest.get(digits + 1).is_some_and(|c| is_ident_char(*c))
     }
 
-    /// A number must not run straight into a letter or `_` (`2x`, `1E3`, `1j`):
-    /// like a glued literal, that is an invalid literal rather than two tokens.
-    fn read_number(&mut self) -> QResult<Token> {
-        let start = self.position;
-        let token = self.read_number_body()?;
-        if self.current_char.is_some_and(is_ident_char) {
-            let text: String = self.input[start..=self.position].iter().collect();
-            return Err(QError::parse(format!("invalid literal: {text}...")));
-        }
-        Ok(token)
-    }
-
     /// True when whitespace is followed by a number literal (`1f 2`, `1f -2`).
     fn number_follows_after_space(&self) -> bool {
         let rest = &self.input[self.position..];
@@ -403,91 +385,44 @@ impl Lexer {
             }
     }
 
-    fn read_number_body(&mut self) -> QResult<Token> {
-        let mut number = String::new();
+    /// A numeric literal is a body (`-?digits*[.digits*][e[+-]digits]`) followed
+    /// by the whole identifier run glued to it. Once the body is read,
+    /// `number_token` decides the (body, suffix) pair in one match, so a number
+    /// running into a letter or `_` (`2x`, `1E3`, `1_000`) is one invalid
+    /// literal rather than two tokens. A bare exponent (`1ex`) is the exception:
+    /// it fails in the body, before any suffix is read.
+    fn read_number(&mut self) -> QResult<Token> {
+        let (body, is_float) = self.read_body()?;
+        let mut suffix = String::new();
+        while let Some(ch) = self.current_char.filter(|c| is_ident_char(*c)) {
+            suffix.push(ch);
+            self.advance();
+        }
+        self.number_token(&body, is_float, &suffix)
+    }
+
+    /// Reads sign, digits, fraction and exponent; `is_float` is true when the
+    /// body has a `.` or an exponent.
+    fn read_body(&mut self) -> QResult<(String, bool)> {
+        let mut body = String::new();
         let mut is_float = false;
-
         if self.current_char == Some('-') {
-            number.push('-');
+            body.push('-');
             self.advance();
         }
-
-        while let Some(ch) = self.current_char {
-            if ch.is_ascii_digit() {
-                number.push(ch);
-                self.advance();
-            } else if ch == '.' && !is_float {
-                is_float = true;
-                number.push(ch);
-                self.advance();
-            } else {
-                break;
-            }
-        }
-
-        if (number == "0" || number == "1")
-            && self.current_char == Some('b')
-            && !self.ident_char_at(1)
-        {
+        self.take_digits(&mut body);
+        if self.current_char == Some('.') {
+            is_float = true;
+            body.push('.');
             self.advance();
-            return Ok(Token::Boolean(number == "1"));
+            self.take_digits(&mut body);
         }
-
-        // `101b`: two or more digits glued to a `b`.
-        if self.current_char == Some('b')
-            && number.len() >= 2
-            && number.chars().all(|c| c.is_ascii_digit())
-        {
-            let bits: Option<Vec<bool>> = number
-                .chars()
-                .map(|c| match c {
-                    '0' => Some(false),
-                    '1' => Some(true),
-                    _ => None,
-                })
-                .collect();
-            return match bits {
-                Some(bits) if !self.ident_char_at(1) => {
-                    self.advance();
-                    Ok(Token::BoolList(bits))
-                }
-                _ => Err(QError::parse(format!("invalid literal: {number}b..."))),
-            };
-        }
-
-        // Null and infinity literals: `0N` `0n` `0w` (optionally negative).
-        if number == "0" || number == "-0" {
-            let neg = number.starts_with('-');
-            let literal = match self.current_char {
-                Some('N') => Some(Token::Integer(i64::MIN)),
-                Some('n') => Some(Token::Float(f64::NAN)),
-                Some('w') => Some(Token::Float(if neg {
-                    f64::NEG_INFINITY
-                } else {
-                    f64::INFINITY
-                })),
-                Some('W') => return Err(QError::Nyi("0W (long infinity)".into())),
-                _ => None,
-            };
-            if let Some(token) = literal {
-                if self.ident_char_at(1) {
-                    return Err(QError::parse(format!(
-                        "invalid literal: {}{}...",
-                        number,
-                        self.current_char.unwrap_or(' ')
-                    )));
-                }
-                self.advance();
-                return Ok(token);
-            }
-        }
-
         if self.current_char == Some('e') {
             is_float = true;
-            number.push('e');
+            body.push('e');
             self.advance();
             if let Some(sign @ ('+' | '-')) = self.current_char {
-                number.push(sign);
+                body.push(sign);
                 self.advance();
             }
             if !self.current_char.is_some_and(|c| c.is_ascii_digit()) {
@@ -495,38 +430,70 @@ impl Lexer {
                     "invalid float: exponent needs digits after 'e'",
                 ));
             }
-            while let Some(ch) = self.current_char.filter(char::is_ascii_digit) {
-                number.push(ch);
-                self.advance();
-            }
+            self.take_digits(&mut body);
         }
+        Ok((body, is_float))
+    }
 
-        if self.current_char == Some('f') && !self.ident_char_at(1) {
-            is_float = true;
+    fn take_digits(&mut self, into: &mut String) {
+        while let Some(ch) = self.current_char.filter(char::is_ascii_digit) {
+            into.push(ch);
             self.advance();
-            // q allows the `f` suffix only on the last item of a run (`1 2 3f`).
-            if self.number_follows_after_space() {
-                return Err(QError::parse(format!("invalid literal: {number}f...")));
+        }
+    }
+
+    /// The (body, suffix) table. `is_float` means the body has a `.` or an
+    /// exponent. Every pair not listed is an invalid literal, checked before
+    /// the body's own range.
+    fn number_token(&self, body: &str, is_float: bool, suffix: &str) -> QResult<Token> {
+        let zero = body == "0" || body == "-0";
+        match suffix {
+            "" => Self::convert(body, is_float),
+            "b" if body.bytes().all(|c| c == b'0' || c == b'1') => {
+                let bits: Vec<bool> = body.bytes().map(|c| c == b'1').collect();
+                Ok(match bits[..] {
+                    [bit] => Token::Boolean(bit),
+                    _ => Token::BoolList(bits),
+                })
             }
+            "f" => {
+                // q allows the `f` suffix only on the last item of a run (`1 2 3f`).
+                if self.number_follows_after_space() {
+                    return Err(Self::invalid_literal(body, suffix));
+                }
+                Self::convert(body, true)
+            }
+            "N" if zero => Ok(Token::Integer(i64::MIN)),
+            "n" if zero => Ok(Token::Float(f64::NAN)),
+            "w" if zero => Ok(Token::Float(if body == "-0" {
+                f64::NEG_INFINITY
+            } else {
+                f64::INFINITY
+            })),
+            "W" if zero => Err(QError::Nyi("0W (long infinity)".into())),
+            _ => Err(Self::invalid_literal(body, suffix)),
         }
+    }
 
-        // A `b` that did not make a boolean literal (`2b`, `1.0b`, `1e3b`).
-        if self.current_char == Some('b') && !self.ident_char_at(1) {
-            return Err(QError::parse(format!("invalid literal: {number}b...")));
-        }
+    /// Names the body and the first character of the glued run.
+    fn invalid_literal(body: &str, suffix: &str) -> QError {
+        let first = suffix.chars().next().unwrap_or_default();
+        QError::parse(format!("invalid literal: {body}{first}..."))
+    }
 
+    fn convert(body: &str, is_float: bool) -> QResult<Token> {
         if is_float {
-            let value = number
+            let value = body
                 .parse::<f64>()
-                .map_err(|_| QError::parse(format!("invalid float: {number}")))?;
+                .map_err(|_| QError::parse(format!("invalid float: {body}")))?;
             if !value.is_finite() {
-                return Err(QError::parse(format!("float out of range: {number}")));
+                return Err(QError::parse(format!("float out of range: {body}")));
             }
             Ok(Token::Float(value))
         } else {
-            let value = number
+            let value = body
                 .parse::<i64>()
-                .map_err(|_| QError::parse(format!("invalid integer: {number}")))?;
+                .map_err(|_| QError::parse(format!("invalid integer: {body}")))?;
             Ok(Token::Integer(value))
         }
     }
