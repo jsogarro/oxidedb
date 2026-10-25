@@ -385,11 +385,25 @@ impl Lexer {
             }
     }
 
-    /// A numeric literal is a body (`-?digits[.digits][e[+-]digits]`) followed
-    /// by the whole identifier run glued to it; `number_token` decides the pair
-    /// in one table, so a number running into a letter or `_` (`2x`, `1E3`,
-    /// `1_000`) is one invalid literal rather than two tokens.
+    /// A numeric literal is a body (`-?digits*[.digits*][e[+-]digits]`) followed
+    /// by the whole identifier run glued to it. Once the body is read,
+    /// `number_token` decides the (body, suffix) pair in one match, so a number
+    /// running into a letter or `_` (`2x`, `1E3`, `1_000`) is one invalid
+    /// literal rather than two tokens. A bare exponent (`1ex`) is the exception:
+    /// it fails in the body, before any suffix is read.
     fn read_number(&mut self) -> QResult<Token> {
+        let (body, is_float) = self.read_body()?;
+        let mut suffix = String::new();
+        while let Some(ch) = self.current_char.filter(|c| is_ident_char(*c)) {
+            suffix.push(ch);
+            self.advance();
+        }
+        self.number_token(&body, is_float, &suffix)
+    }
+
+    /// Reads sign, digits, fraction and exponent; `is_float` is true when the
+    /// body has a `.` or an exponent.
+    fn read_body(&mut self) -> QResult<(String, bool)> {
         let mut body = String::new();
         let mut is_float = false;
         if self.current_char == Some('-') {
@@ -418,12 +432,7 @@ impl Lexer {
             }
             self.take_digits(&mut body);
         }
-        let mut suffix = String::new();
-        while let Some(ch) = self.current_char.filter(|c| is_ident_char(*c)) {
-            suffix.push(ch);
-            self.advance();
-        }
-        self.number_token(&body, is_float, &suffix)
+        Ok((body, is_float))
     }
 
     fn take_digits(&mut self, into: &mut String) {

@@ -75,3 +75,59 @@ fn bad_body_pairs_name_body_and_first_suffix_char() {
     invalid("0.5N", "0.5N");
     invalid("1j", "1j");
 }
+
+#[test]
+fn only_a_zero_body_takes_the_null_and_infinity_suffixes() {
+    invalid("1W", "1W");
+    invalid("1.5W", "1.5W");
+    invalid("1n", "1n");
+    invalid("1w", "1w");
+    invalid("00N", "00N");
+}
+
+#[test]
+fn zero_w_is_nyi_only_when_nothing_is_glued_to_it() {
+    let nyi = Err(QError::Nyi("0W (long infinity)".into()));
+    assert_eq!(lex("0W"), nyi);
+    assert_eq!(lex("-0W"), nyi);
+    invalid("0Wx", "0W");
+    invalid("0W0", "0W");
+}
+
+#[test]
+fn bodies_with_a_sign_or_fraction_still_reject_a_bad_suffix() {
+    invalid("-1x", "-1x");
+    invalid("-1.5b", "-1.5b");
+    invalid(".5b", ".5b");
+    invalid("1.b", "1.b");
+    invalid("1e3_", "1e3_");
+    invalid("1f 2", "1f");
+    assert_eq!(
+        lex("1ex"),
+        Err(QError::parse(
+            "invalid float: exponent needs digits after 'e'"
+        ))
+    );
+}
+
+#[test]
+fn a_valid_literal_stops_at_the_first_non_identifier_character() {
+    assert_eq!(
+        lex("1f-2").unwrap(),
+        vec![
+            Token::Float(1.0),
+            Token::Minus,
+            Token::Integer(2),
+            Token::Eof
+        ]
+    );
+    assert_eq!(
+        lex("110b").unwrap(),
+        vec![Token::BoolList(vec![true, true, false]), Token::Eof]
+    );
+    assert_eq!(lex("0b").unwrap(), vec![Token::Boolean(false), Token::Eof]);
+    assert_eq!(
+        lex("00b").unwrap(),
+        vec![Token::BoolList(vec![false, false]), Token::Eof]
+    );
+}
