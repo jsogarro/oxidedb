@@ -13,7 +13,7 @@ cargo run -- book/examples/filename.o
 
 - `01-atoms-and-arithmetic.o` - Basic atoms and arithmetic operations
 - `02-variables-and-assignment.o` - Variable assignment and usage
-- `03-vectors-and-lists.o` - Vector literals (longs, floats, booleans, symbols, strings) and arithmetic on vectors
+- `03-vectors-and-lists.o` - Vector literals (longs, floats, booleans, symbols, strings), arithmetic on vectors, and general lists
 
 ## File Format
 

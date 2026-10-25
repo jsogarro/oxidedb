@@ -82,6 +82,21 @@ impl Atom {
         }
     }
 
+    /// The null of this atom's type (`0N`, `0n`, `` ` ``, ...); q has no boolean null, so
+    /// a boolean gives `0b`.
+    pub fn null_like(&self) -> Atom {
+        match self {
+            Atom::Boolean(_) => Atom::Boolean(false),
+            Atom::Integer(_) => Atom::Integer(i64::MIN),
+            Atom::Float(_) => Atom::Float(f64::NAN),
+            Atom::Character(_) => Atom::Character(' '),
+            Atom::Symbol(_) => Atom::Symbol(Sym::NULL),
+            Atom::Date(_) | Atom::NullDate => Atom::NullDate,
+            Atom::Time(_) | Atom::NullTime => Atom::NullTime,
+            Atom::Timestamp(_) | Atom::NullTimestamp => Atom::NullTimestamp,
+        }
+    }
+
     pub fn as_boolean(&self) -> Option<bool> {
         match self {
             Atom::Boolean(b) => Some(*b),

@@ -19,6 +19,8 @@ pub enum Expr {
         func: Box<Expr>,
         args: Vec<Expr>,
     },
+    /// `(a;b;c)`: two or more items, in source order.
+    List(Vec<Expr>),
     Assignment {
         name: String,
         value: Box<Expr>,

@@ -333,23 +333,36 @@ impl Parser {
             Token::Str(s) => Ok(vector(Column::Char(s.chars().collect()))),
             Token::BoolList(bits) => Ok(vector(Column::Bool(bits.clone()))),
             Token::Symbol(s) => Ok(Expr::Symbol(s.clone())),
-            Token::LeftParen => {
-                if self.check(&Token::RightParen) || self.check(&Token::Semicolon) {
-                    return Err(QError::Nyi("general lists".into()));
-                }
-                let expr = self.expression()?;
-                if self.check(&Token::Semicolon) {
-                    return Err(QError::Nyi("general lists".into()));
-                }
-                if !self.match_tokens(&[Token::RightParen]) {
-                    return Err(nyi_token(self.peek())
-                        .unwrap_or_else(|| QError::parse("expected ')' after expression")));
-                }
-                Ok(expr)
-            }
+            Token::LeftParen => self.paren(),
             token => {
                 Err(nyi_token(token)
                     .unwrap_or_else(|| QError::parse(format!("unexpected {}", token))))
+            }
+        }
+    }
+
+    /// After `(`: grouping `(x)`, the empty list `()`, or the items of `(a;b;...)`.
+    /// Each item is an `expression()`, so every item spends from the line budget.
+    fn paren(&mut self) -> QResult<Expr> {
+        if self.match_tokens(&[Token::RightParen]) {
+            return Ok(Expr::Lit(Value::List(Rc::default())));
+        }
+        let mut items = Vec::new();
+        loop {
+            if self.check(&Token::Semicolon) || self.check(&Token::RightParen) {
+                return Err(QError::Nyi("elided list item".into()));
+            }
+            items.push(self.expression()?);
+            if self.match_tokens(&[Token::RightParen]) {
+                // parentheses only group: `(1)` is the atom 1
+                return Ok(match items.len() {
+                    1 => items.remove(0),
+                    _ => Expr::List(items),
+                });
+            }
+            if !self.match_tokens(&[Token::Semicolon]) {
+                return Err(nyi_token(self.peek())
+                    .unwrap_or_else(|| QError::parse("expected ')' after expression")));
             }
         }
     }

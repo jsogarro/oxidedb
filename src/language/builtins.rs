@@ -1,4 +1,4 @@
-//! Named builtin functions (`til`, `count`, `neg`). The interpreter resolves a name
+//! Named builtin functions (`til`, `count`, `neg`, `enlist`). The interpreter resolves a name
 //! to a builtin after variables, then calls it with already-evaluated args.
 
 use crate::error::{QError, QResult};
@@ -13,6 +13,7 @@ pub enum Builtin {
     Til,
     Count,
     Neg,
+    Enlist,
 }
 
 pub fn lookup(name: &str) -> Option<Builtin> {
@@ -20,6 +21,7 @@ pub fn lookup(name: &str) -> Option<Builtin> {
         "til" => Some(Builtin::Til),
         "count" => Some(Builtin::Count),
         "neg" => Some(Builtin::Neg),
+        "enlist" => Some(Builtin::Enlist),
         _ => None,
     }
 }
@@ -30,12 +32,13 @@ impl Builtin {
             Builtin::Til => "til",
             Builtin::Count => "count",
             Builtin::Neg => "neg",
+            Builtin::Enlist => "enlist",
         }
     }
 
     pub fn arity(self) -> usize {
         match self {
-            Builtin::Til | Builtin::Count | Builtin::Neg => 1,
+            Builtin::Til | Builtin::Count | Builtin::Neg | Builtin::Enlist => 1,
         }
     }
 
@@ -48,6 +51,8 @@ impl Builtin {
             Builtin::Til => til(&args[0]),
             Builtin::Count => Ok(count(&args[0])),
             Builtin::Neg => ops::monad_neg(&args[0]),
+            // an atom becomes a one-item vector, anything else a one-item general list
+            Builtin::Enlist => Value::list_checked(vec![args[0].clone()]),
         }
     }
 }

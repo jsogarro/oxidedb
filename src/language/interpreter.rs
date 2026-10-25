@@ -6,7 +6,7 @@ use crate::language::{
     parser::Parser,
 };
 use crate::types::column::Column;
-use crate::types::value::Value;
+use crate::types::value::{Value, MAX_LOGICAL_ITEMS};
 use std::collections::HashMap;
 
 pub struct Interpreter {
@@ -73,6 +73,24 @@ impl Interpreter {
                 match operator {
                     UnaryOperator::Negate => ops::monad_neg(&val),
                 }
+            }
+            Expr::List(items) => {
+                // right to left, like every other construct; stops at the first item that takes
+                // the list past the size cap rather than building them all and checking at the end
+                let mut vals = Vec::with_capacity(items.len());
+                let mut total = 0u64;
+                for item in items.into_iter().rev() {
+                    let v = self.evaluate(item)?;
+                    total = total.saturating_add(v.logical_size());
+                    if total > MAX_LOGICAL_ITEMS as u64 {
+                        return Err(QError::Limit(format!(
+                            "value larger than {MAX_LOGICAL_ITEMS} items"
+                        )));
+                    }
+                    vals.push(v);
+                }
+                vals.reverse();
+                Value::list_checked(vals)
             }
             Expr::Assignment { name, value } => {
                 let val = self.evaluate(*value)?;

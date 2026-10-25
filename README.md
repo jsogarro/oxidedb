@@ -96,7 +96,8 @@ Phase 1 of the O language implementation is **complete** with a fully functional
 
 #### Phase 2: Vectors and Lists (book Chapter 3) 🚧 **IN PROGRESS**
 - ✅ Vector literals (`1 2 3`, `1 2.5 3`, `101b`, `` `a`b ``, `"abc"`), symbol atoms and vector arithmetic
-- ✅ `til`, `count` and `neg`
+- ✅ `til`, `count`, `neg` and `enlist`
+- ✅ General lists (`(1;`a;2.5)`, `(1 2;3 4)`, `()`): mixed and nested items, normalised to a vector when the items share a type, printed as q does
 - ✅ Take and join (`#`, `,`)
 - ✅ Indexing (`v[i]`, `v i`, `v[0 2]`; out of range gives a null)
 - ✅ Item assignment (`v[i]:x`, `v[0 2]:7 8`; the value must have the vector's type, out of range is `'length`, a shared copy is unchanged)
@@ -181,7 +182,7 @@ Complete guide to the O programming language located in `/book/`:
 - **Introduction**: Overview of O and OxideDB
 - **Chapter 1**: Atoms and Basic Arithmetic
 - **Chapter 2**: Variables and Assignment
-- **Chapter 3**: Vectors and Lists (in progress: vector literals, arithmetic, comparison, `til`, `count`, indexing, item assignment, take and join)
+- **Chapter 3**: Vectors and Lists (in progress: vector literals, arithmetic, comparison, `til`, `count`, `enlist`, indexing, item assignment, general lists, take and join)
 
 ### Executable Examples
 Run interactive examples from the book:

@@ -121,7 +121,8 @@ fn value_display() {
     assert_eq!(Value::Atom(Atom::Float(f64::NAN)).to_string(), "0n");
     assert_eq!(longs(&[1, 2, 3]).to_string(), "1 2 3");
     assert_eq!(longs(&[1]).to_string(), ",1");
-    assert_eq!(Value::List(Rc::new(vec![])).to_string(), "()");
+    // q prints nothing for `()`; as an item of a list it is `()` (see tests/general_lists.rs)
+    assert_eq!(Value::List(Rc::new(vec![])).to_string(), "");
     let l = Value::List(Rc::new(vec![
         int(1),
         Value::Atom(Atom::Float(2.5)),
