@@ -1,4 +1,4 @@
-//! A numeric literal is a body (`-?digits[.digits][e[+-]digits]`) plus the whole
+//! A numeric literal is a body (`-?digits*[.digits*][e[+-]digits]`) plus the whole
 //! trailing identifier run, decided together: a valid (body, suffix) pair is a
 //! token, anything else is one `invalid literal` error naming the body and the
 //! first character of the run.
@@ -130,4 +130,26 @@ fn a_valid_literal_stops_at_the_first_non_identifier_character() {
         lex("00b").unwrap(),
         vec![Token::BoolList(vec![false, false]), Token::Eof]
     );
+}
+
+#[test]
+fn every_body_shape_lexes_to_its_value() {
+    let one = |src: &str| {
+        let mut t = lex(src).unwrap();
+        assert_eq!(t.pop(), Some(Token::Eof));
+        t
+    };
+    assert_eq!(one("0w"), vec![Token::Float(f64::INFINITY)]);
+    assert_eq!(one("1e+3"), vec![Token::Float(1000.0)]);
+    assert_eq!(one("1e-3"), vec![Token::Float(0.001)]);
+    assert_eq!(one("1.5"), vec![Token::Float(1.5)]);
+    assert_eq!(one("1."), vec![Token::Float(1.0)]);
+    assert_eq!(one("1.e3"), vec![Token::Float(1000.0)]);
+    assert_eq!(one(".5"), vec![Token::Float(0.5)]);
+    assert_eq!(one("-.5"), vec![Token::Float(-0.5)]);
+}
+
+#[test]
+fn a_long_glued_run_is_still_one_error() {
+    invalid(&format!("1{}", "x".repeat(100_000)), "1x");
 }
