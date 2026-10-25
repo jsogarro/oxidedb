@@ -52,7 +52,7 @@ impl Builtin {
             Builtin::Count => Ok(count(&args[0])),
             Builtin::Neg => ops::monad_neg(&args[0]),
             // an atom becomes a one-item vector, anything else a one-item general list
-            Builtin::Enlist => ops::limited(Value::from_items(vec![args[0].clone()])),
+            Builtin::Enlist => Value::list_checked(vec![args[0].clone()]),
         }
     }
 }

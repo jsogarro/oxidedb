@@ -635,3 +635,15 @@ fn glist_out_of_range_index_gives_the_null_of_a_temporal_first_item() {
         assert_eq!(i.eval_line("l 5").unwrap().unwrap().to_string(), null);
     }
 }
+
+#[test]
+fn glist_literal_fails_fast_once_the_items_exceed_the_cap() {
+    // items evaluate right to left; the first `til 10000000` alone is over the item cap, so
+    // the literal must stop there instead of building every item and checking at the end
+    let mut i = Interpreter::new();
+    assert!(matches!(
+        i.eval_line("(x:5;til 10000000;til 10000000)"),
+        Err(QError::Limit(_))
+    ));
+    assert_eq!(i.get("x"), None);
+}
