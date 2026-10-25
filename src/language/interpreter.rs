@@ -81,11 +81,9 @@ impl Interpreter {
                     vals.push(self.evaluate(item)?);
                 }
                 vals.reverse();
-                {
-                    let list = Value::from_items(vals);
-                    list.check_nesting(0)?;
-                    Ok(list)
-                }
+                let list = Value::from_items(vals);
+                list.check_nesting(0)?;
+                Ok(list)
             }
             Expr::Assignment { name, value } => {
                 let val = self.evaluate(*value)?;

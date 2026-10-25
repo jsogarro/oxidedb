@@ -162,6 +162,11 @@ fn own_form(items: &[Value]) -> bool {
         || (matches!(first, Some(1 | 10)) && items.iter().all(|v| Some(v.type_code()) == first))
 }
 
+/// The most bytes a padded matrix may take. Padding makes every row as wide as the widest cell,
+/// so the text is rows x width however small the value is; past this a list is shown line per
+/// item in its own form instead (linear in the value).
+const MAX_MATRIX_BYTES: usize = 32 << 20;
+
 /// One string per item of a general list, the way the q console builds them; a matrix has its
 /// columns padded to the widest cell.
 fn lines(items: &[Value]) -> Vec<String> {
@@ -172,6 +177,10 @@ fn lines(items: &[Value]) -> Vec<String> {
     let widths: Vec<usize> = (0..rows[0].len())
         .map(|j| rows.iter().map(|r| r[j].chars().count()).max().unwrap_or(0))
         .collect();
+    let row_bytes = widths.iter().sum::<usize>() + widths.len();
+    if rows.len().saturating_mul(row_bytes) > MAX_MATRIX_BYTES {
+        return items.iter().map(repr).collect();
+    }
     rows.iter()
         .map(|row| {
             // padded by hand: `{:<w$}` panics for widths past 65,535
