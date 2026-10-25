@@ -10,6 +10,12 @@ fn lex(src: &str) -> Result<Vec<Token>, QError> {
     Lexer::new(src).tokenize()
 }
 
+fn one(src: &str) -> Vec<Token> {
+    let mut t = lex(src).unwrap();
+    assert_eq!(t.pop(), Some(Token::Eof));
+    t
+}
+
 fn invalid(src: &str, shown: &str) {
     assert_eq!(
         lex(src),
@@ -52,11 +58,6 @@ fn a_valid_suffix_still_reports_the_range_error() {
 
 #[test]
 fn valid_pairs_are_unchanged() {
-    let one = |src: &str| {
-        let mut t = lex(src).unwrap();
-        assert_eq!(t.pop(), Some(Token::Eof));
-        t
-    };
     assert_eq!(one("1b"), vec![Token::Boolean(true)]);
     assert_eq!(one("101b"), vec![Token::BoolList(vec![true, false, true])]);
     assert_eq!(one("1f"), vec![Token::Float(1.0)]);
@@ -134,11 +135,6 @@ fn a_valid_literal_stops_at_the_first_non_identifier_character() {
 
 #[test]
 fn every_body_shape_lexes_to_its_value() {
-    let one = |src: &str| {
-        let mut t = lex(src).unwrap();
-        assert_eq!(t.pop(), Some(Token::Eof));
-        t
-    };
     assert_eq!(one("0w"), vec![Token::Float(f64::INFINITY)]);
     assert_eq!(one("1e+3"), vec![Token::Float(1000.0)]);
     assert_eq!(one("1e-3"), vec![Token::Float(0.001)]);
@@ -152,4 +148,12 @@ fn every_body_shape_lexes_to_its_value() {
 #[test]
 fn a_long_glued_run_is_still_one_error() {
     invalid(&format!("1{}", "x".repeat(100_000)), "1x");
+}
+
+#[test]
+fn f_then_spaced_minus_dot_non_digit_is_not_a_following_number() {
+    for src in ["1f -.x", "1f -.-", "1f -.("] {
+        let shown = format!("{:?}", lex(src));
+        assert!(!shown.contains("invalid literal: 1f"), "{src}: {shown}");
+    }
 }
