@@ -302,9 +302,9 @@ fn vec_lit_parenthesised_semicolon_builds_lists_and_elided_items_are_nyi() {
     for src in ["(1;)", "(;)", "(;1)", "(;;)", "(1;;2)"] {
         assert_eq!(eval(src), nyi, "{src}");
     }
-    for src in ["(1;2;3)", "()", "(1 2;3)"] {
-        assert!(eval(src).is_ok(), "{src}");
-    }
+    assert_eq!(eval("(1;2;3)"), Ok(longs(&[1, 2, 3])));
+    assert_eq!(eval("()"), Ok(Value::List(Default::default())));
+    assert_eq!(show("(1 2;3)"), "1 2\n3");
 }
 
 #[test]

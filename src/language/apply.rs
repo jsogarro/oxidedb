@@ -67,16 +67,16 @@ fn index(f: &Value, i: &Value) -> QResult<Value> {
 /// (an atom's null, an empty vector of a vector's type, a list of nulls for a list),
 /// and `()` for the empty list.
 fn null_like(items: &[Value]) -> Value {
-    match items.first() {
-        None => Value::List(Rc::default()),
-        Some(Value::Atom(a)) => Value::Atom(a.null_like()),
-        Some(Value::Vector(c)) => Value::Vector(Rc::new(c.index(&[]))),
-        Some(Value::List(inner)) => Value::from_items(
-            inner
-                .iter()
-                .map(|v| null_like(std::slice::from_ref(v)))
-                .collect(),
-        ),
+    items
+        .first()
+        .map_or_else(|| Value::List(Rc::default()), null_of)
+}
+
+fn null_of(v: &Value) -> Value {
+    match v {
+        Value::Atom(a) => Value::Atom(a.null_like()),
+        Value::Vector(c) => Value::Vector(Rc::new(c.index(&[]))),
+        Value::List(inner) => Value::from_items(inner.iter().map(null_of).collect()),
     }
 }
 

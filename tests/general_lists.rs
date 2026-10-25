@@ -601,3 +601,49 @@ proptest! {
         prop_assert_eq!(got.to_string(), render(&t), "{}", t.src());
     }
 }
+
+#[test]
+fn glist_mismatched_or_trailing_brackets_error_without_panic() {
+    for src in ["(1;2]", "(1 2 3 4]", "(1;2))", "(1;2)]"] {
+        assert!(run(src).is_err(), "{src}");
+    }
+}
+
+#[test]
+fn glist_out_of_range_index_gives_the_null_of_a_temporal_first_item() {
+    use chrono::{NaiveDate, NaiveTime, TimeZone, Utc};
+    let firsts = [
+        (
+            Atom::Date(NaiveDate::from_ymd_opt(2000, 1, 1).unwrap()),
+            "0Nd",
+        ),
+        (
+            Atom::Time(NaiveTime::from_hms_opt(12, 0, 0).unwrap()),
+            "0Nt",
+        ),
+        (Atom::Timestamp(Utc.timestamp_opt(0, 0).unwrap()), "0Np"),
+    ];
+    for (first, null) in firsts {
+        let mut i = Interpreter::new();
+        i.set(
+            "l",
+            Value::List(std::rc::Rc::new(vec![
+                Value::Atom(first),
+                Value::Atom(Atom::Integer(1)),
+            ])),
+        );
+        assert_eq!(i.eval_line("l 5").unwrap().unwrap().to_string(), null);
+    }
+}
+
+#[test]
+fn glist_literal_fails_fast_once_the_items_exceed_the_cap() {
+    // items evaluate right to left; the first `til 10000000` alone is over the item cap, so
+    // the literal must stop there instead of building every item and checking at the end
+    let mut i = Interpreter::new();
+    assert!(matches!(
+        i.eval_line("(x:5;til 10000000;til 10000000)"),
+        Err(QError::Limit(_))
+    ));
+    assert_eq!(i.get("x"), None);
+}

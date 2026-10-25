@@ -144,6 +144,14 @@ impl Value {
         Ok(())
     }
 
+    /// [`from_items`](Value::from_items) under the [`check_nesting`](Value::check_nesting) guard:
+    /// how every list built from evaluated items (literals, `enlist`) is made.
+    pub fn list_checked(items: Vec<Value>) -> QResult<Value> {
+        let list = Value::from_items(items);
+        list.check_nesting(0)?;
+        Ok(list)
+    }
+
     /// The one place lists are built: same-typed atoms collapse into a vector
     /// (no int to float promotion); empty or anything else is a general list.
     pub fn from_items(items: Vec<Value>) -> Value {
