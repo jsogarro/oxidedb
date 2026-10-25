@@ -156,10 +156,13 @@ fn item_len(v: &Value) -> usize {
 /// Items that are atoms, of different lengths, or all boolean (or all character) vectors
 /// keep their own form; otherwise they are the rows of a matrix.
 fn own_form(items: &[Value]) -> bool {
-    let first = items.first().map(Value::type_code);
+    let Some(first) = items.first() else {
+        return true;
+    };
+    let (len, code) = (item_len(first), first.type_code());
     items.iter().any(|v| matches!(v, Value::Atom(_)))
-        || items.iter().any(|v| item_len(v) != item_len(&items[0]))
-        || (matches!(first, Some(1 | 10)) && items.iter().all(|v| Some(v.type_code()) == first))
+        || items.iter().any(|v| item_len(v) != len)
+        || (matches!(code, 1 | 10) && items.iter().all(|v| v.type_code() == code))
 }
 
 /// The most bytes a padded matrix may take. Padding makes every row as wide as the widest cell,
@@ -170,9 +173,14 @@ const MAX_MATRIX_BYTES: usize = 32 << 20;
 /// One string per item of a general list, the way the q console builds them; a matrix has its
 /// columns padded to the widest cell.
 fn lines(items: &[Value]) -> Vec<String> {
-    if items.is_empty() || own_form(items) {
+    if own_form(items) {
         return items.iter().map(repr).collect();
     }
+    matrix_lines(items)
+}
+
+/// `lines` for items known not to be in their own form.
+fn matrix_lines(items: &[Value]) -> Vec<String> {
     let rows: Vec<Vec<String>> = items.iter().map(cells).collect();
     let widths: Vec<usize> = (0..rows[0].len())
         .map(|j| rows.iter().map(|r| r[j].chars().count()).max().unwrap_or(0))
@@ -199,7 +207,7 @@ fn lines(items: &[Value]) -> Vec<String> {
 /// (its columns must be measured), so its worst case is the whole text at once.
 pub(crate) fn fmt_list(f: &mut fmt::Formatter, items: &[Value]) -> fmt::Result {
     if !own_form(items) {
-        return f.write_str(&lines(items).join("\n"));
+        return f.write_str(&matrix_lines(items).join("\n"));
     }
     for (i, x) in items.iter().enumerate() {
         if i > 0 {

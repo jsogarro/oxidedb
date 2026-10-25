@@ -76,14 +76,13 @@ impl Interpreter {
             }
             Expr::List(items) => {
                 // right to left, like every other construct
-                let mut vals = Vec::with_capacity(items.len());
-                for item in items.into_iter().rev() {
-                    vals.push(self.evaluate(item)?);
-                }
+                let mut vals = items
+                    .into_iter()
+                    .rev()
+                    .map(|item| self.evaluate(item))
+                    .collect::<QResult<Vec<_>>>()?;
                 vals.reverse();
-                let list = Value::from_items(vals);
-                list.check_nesting(0)?;
-                Ok(list)
+                ops::limited(Value::from_items(vals))
             }
             Expr::Assignment { name, value } => {
                 let val = self.evaluate(*value)?;

@@ -52,14 +52,9 @@ impl Builtin {
             Builtin::Count => Ok(count(&args[0])),
             Builtin::Neg => ops::monad_neg(&args[0]),
             // an atom becomes a one-item vector, anything else a one-item general list
-            Builtin::Enlist => checked(Value::from_items(vec![args[0].clone()])),
+            Builtin::Enlist => ops::limited(Value::from_items(vec![args[0].clone()])),
         }
     }
-}
-
-fn checked(v: Value) -> QResult<Value> {
-    v.check_nesting(0)?;
-    Ok(v)
 }
 
 /// Call the builtin `name`; an unknown name is `'name (Undefined variable)`.

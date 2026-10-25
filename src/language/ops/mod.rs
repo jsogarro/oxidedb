@@ -19,7 +19,7 @@ pub fn dyad(verb: Verb, left: &Value, right: &Value) -> QResult<Value> {
 
 /// A list a verb returns must respect the nesting and size caps (`Value::check_nesting`):
 /// join and take can multiply a value that is within them.
-fn limited(result: Value) -> QResult<Value> {
+pub(crate) fn limited(result: Value) -> QResult<Value> {
     if let Value::List(_) = result {
         result.check_nesting(0)?;
     }
