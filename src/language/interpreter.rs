@@ -26,15 +26,18 @@ impl Interpreter {
         }
     }
 
-    /// Lex, parse and evaluate one line. `None` means the line had no tokens
-    /// (e.g. blank or comment-only).
+    /// Lex, parse and evaluate one line. `None` means there is nothing to print: the line had no
+    /// tokens (blank or comment-only), or it ran and ended in `;` (`x:5;`).
     pub fn eval_line(&mut self, input: &str) -> QResult<Option<Value>> {
         let tokens = Lexer::new(input).tokenize()?;
         if tokens == [Token::Eof] {
             return Ok(None);
         }
         let ast = Parser::new(tokens).parse()?;
-        self.evaluate(ast).map(Some)
+        // a trailing `;` runs the line and prints nothing
+        let silent = matches!(ast, Expr::Sequence { silent: true, .. });
+        let value = self.evaluate(ast)?;
+        Ok((!silent).then_some(value))
     }
 
     /// Bind `name` to `value`, as `name:value` would.
@@ -73,6 +76,17 @@ impl Interpreter {
                 match operator {
                     UnaryOperator::Negate => ops::monad_neg(&val),
                 }
+            }
+            Expr::Sequence { mut statements, .. } => {
+                // only the last value survives; the others are dropped at once, so a discarded
+                // `v` does not hold a second reference that `v[0]:x` would copy the vector for
+                let Some(last) = statements.pop() else {
+                    return Ok(Value::List(Default::default()));
+                };
+                for statement in statements {
+                    self.evaluate(statement)?;
+                }
+                self.evaluate(last)
             }
             Expr::List(items) => {
                 // right to left, like every other construct; stops at the first item that takes

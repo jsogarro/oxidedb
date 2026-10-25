@@ -558,7 +558,7 @@ oxidedb> d
 oxidedb> e
 2 0 0
 ```
-An assignment is an expression like any other and takes everything on its right, so it can sit inside a bigger one. The value is evaluated first and then the index, right to left:
+An assignment is an expression like any other and takes everything on its right (up to the next `;`), so it can sit inside a bigger one. The value is evaluated first and then the index, right to left:
 ```
 oxidedb> 1+d[0 1]:5 6
 6 7
@@ -908,7 +908,6 @@ Changing an item of an item, and the combined forms of assignment, are the last 
 These parts of the chapter will be added as the features arrive. None of them work yet, so there are no samples for them:
 
 - changing an item of an item (`d[0][1]:5`) and the combined forms (`d[0]+:1`)
-- several statements on one line, separated by `;`
 - adverbs and functions
 
 ## Exercises
@@ -958,4 +957,4 @@ These parts of the chapter will be added as the features arrive. None of them wo
 - `(a;b;c)` builds a general list, evaluated right to left; items of one atom type collapse to a vector (`(1;2;3)` is `1 2 3`), anything else stays a list (type 0) that prints one item per line; `(1)` is just `1`, `()` is the empty list and prints nothing, and `enlist` makes a one-item list
 - A list of equal-length vectors prints as aligned columns; an out-of-range index into a list gives the null of the first item's type
 - `v[i]:x` replaces items in place (`v[0 2]:7 8` pairwise, `v[0 2]:9` for every index, the last of a repeated index wins) and a copy made with another name is not changed; the value must have the vector's exact type (`'type`, never converted) and an out-of-range index is `'length` where a read gives a null
-- General lists are done; changing an item of an item, `;` statements, adverbs and functions are still to come
+- General lists are done; changing an item of an item, adverbs and functions are still to come
